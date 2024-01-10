@@ -18,9 +18,9 @@ Servo myservo;
 
 void setup() {
   Serial.begin(115200);  // Initiate a serial communication
-  EEPROM.begin(5*7);      // Initiate EEPROM memory size
-  SPI.begin();         // Initiate  SPI bus
-  mfrc522.PCD_Init();  // Initiate MFRC522
+  EEPROM.begin(5 * 7);   // Initiate EEPROM memory size
+  SPI.begin();           // Initiate  SPI bus
+  mfrc522.PCD_Init();    // Initiate MFRC522
   Serial.println("Approximate your card to the reader...");
   Serial.println();
 
@@ -30,9 +30,15 @@ void setup() {
   pinMode(buzzer, OUTPUT);
   //access_tone();
 
-  UID[1] = "50 48 B5 1E";
-  UID[2] = "0A 59 91 17";
-  UID[3] = "84 93 E4 52";
+  //UID[1] = "50 48 B5 1E";
+  //UID[2] = "0A 59 91 17";
+  //UID[3] = "84 93 E4 52";
+
+  //put_memory(UID);
+  //EEPROM.put(0,UID[1]);
+  EEPROM.get(0,UID[1]);
+  Serial.println(UID[1]);
+  //read_memory();
 }
 
 void loop() {
@@ -49,17 +55,24 @@ void loop() {
   // Only read the UID if it is over the interval length since it has last been read
   currentMillis = millis();
   if (currentMillis - previousMillis > interval) {
-    for(int i = 0; i < 4; i++){
-      if(UID[i] == read_RFID()){
+    bool access_granted = false;
+
+    for (int i = 0; i < 4; i++) {
+      if (UID[i] == read_RFID()) {
         access_tone();
+        access_granted = true;
       }
+
       Serial.println(UID[i]);
+    }
+
+    if (access_granted == false) {
+      no_access_tone();
     }
 
     String active_UID = read_RFID();
     Serial.println(active_UID);
   }
-
 }
 
 String read_RFID() {
@@ -73,6 +86,22 @@ String read_RFID() {
   }
   content.toUpperCase();
   return content.substring(1);  // return the UID
+}
+
+String *read_memory() {
+  static String memory[4];
+  for (int i = 0; i < 4; i++) {
+    EEPROM.get(i * 7, memory[i]);
+  }
+  return memory;
+}
+
+void put_memory(String memory[]) {
+  for (int i = 0; i < 4; i++) {
+    EEPROM.put(i * 7, memory[i]);
+    Serial.println(memory[i]);
+  }
+  bool ok1 = EEPROM.commit();
 }
 
 void move_servo(int degree) {
