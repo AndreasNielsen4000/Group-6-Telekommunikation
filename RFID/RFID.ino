@@ -2,37 +2,40 @@
 #include <MFRC522.h>
 #include <Servo.h>
 //#include <EEPROM.h>
-//#include <ESP_EEPROM.h>
+#include <ESP_EEPROM.h>
 
 #define SS_PIN D8
 #define RST_PIN D0
+#define buzzer D1
 MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance.
 
 unsigned long previousMillis = 0;  // will store last time the RIFD was read
 unsigned long currentMillis;
 const long interval = 5000;  // interval at which to blink (milliseconds)
+String UID[4];
 
 Servo myservo;
 
 void setup() {
   Serial.begin(115200);  // Initiate a serial communication
+  EEPROM.begin(5*7);      // Initiate EEPROM memory size
   SPI.begin();         // Initiate  SPI bus
   mfrc522.PCD_Init();  // Initiate MFRC522
   Serial.println("Approximate your card to the reader...");
   Serial.println();
 
-  //myservo.attach(8);  // attaches the servo on pin 9 to the servo object
-  //move_servo(90);
+  myservo.attach(D4);  // attaches the servo on pin 9 to the servo object
+  move_servo(90);
 
-  //pinMode(7, OUTPUT);
+  pinMode(buzzer, OUTPUT);
   //access_tone();
+
+  UID[1] = "50 48 B5 1E";
+  UID[2] = "0A 59 91 17";
+  UID[3] = "84 93 E4 52";
 }
 
 void loop() {
-
-
-
-
 
   // Look for new cards
   if (!mfrc522.PICC_IsNewCardPresent()) {
@@ -46,9 +49,17 @@ void loop() {
   // Only read the UID if it is over the interval length since it has last been read
   currentMillis = millis();
   if (currentMillis - previousMillis > interval) {
+    for(int i = 0; i < 4; i++){
+      if(UID[i] == read_RFID()){
+        access_tone();
+      }
+      Serial.println(UID[i]);
+    }
+
     String active_UID = read_RFID();
     Serial.println(active_UID);
   }
+
 }
 
 String read_RFID() {
@@ -69,25 +80,25 @@ void move_servo(int degree) {
 }
 
 void access_tone() {
-  tone(7, 1046.5);
+  tone(buzzer, 1046.5);
   delay(200);
-  tone(7, 1174.66);
+  tone(buzzer, 1174.66);
   delay(200);
-  tone(7, 1318.51);
+  tone(buzzer, 1318.51);
   delay(200);
-  noTone(7);
+  noTone(buzzer);
   delay(800);
-  tone(7, 1396.91);
+  tone(buzzer, 1396.91);
   delay(300);
-  noTone(7);
+  noTone(buzzer);
 }
 
 void no_access_tone() {
-  tone(7, 932.33);
+  tone(buzzer, 932.33);
   delay(500);
-  tone(7, 880);
+  tone(buzzer, 880);
   delay(500);
-  tone(7, 830.61);
+  tone(buzzer, 830.61);
   delay(800);
-  noTone(7);
+  noTone(buzzer);
 }
