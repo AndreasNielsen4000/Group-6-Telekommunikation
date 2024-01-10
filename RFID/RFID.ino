@@ -1,11 +1,11 @@
 #include <SPI.h>
 #include <MFRC522.h>
 #include <Servo.h>
-#include <EEPROM.h>
+//#include <EEPROM.h>
 //#include <ESP_EEPROM.h>
 
-#define SS_PIN 10
-#define RST_PIN 9
+#define SS_PIN D8
+#define RST_PIN D0
 MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance.
 
 unsigned long previousMillis = 0;  // will store last time the RIFD was read
@@ -15,17 +15,17 @@ const long interval = 5000;  // interval at which to blink (milliseconds)
 Servo myservo;
 
 void setup() {
-  Serial.begin(9600);  // Initiate a serial communication
+  Serial.begin(115200);  // Initiate a serial communication
   SPI.begin();         // Initiate  SPI bus
   mfrc522.PCD_Init();  // Initiate MFRC522
   Serial.println("Approximate your card to the reader...");
   Serial.println();
 
-  myservo.attach(8);  // attaches the servo on pin 9 to the servo object
-  move_servo(90);
+  //myservo.attach(8);  // attaches the servo on pin 9 to the servo object
+  //move_servo(90);
 
-  pinMode(7, OUTPUT);
-  access_tone();
+  //pinMode(7, OUTPUT);
+  //access_tone();
 }
 
 void loop() {
