@@ -1,53 +1,54 @@
 #include <SPI.h>
 #include <MFRC522.h>
 #include <Servo.h>
-//#include <EEPROM.h>
 #include <ESP_EEPROM.h>
 
 #define SS_PIN D8
 #define RST_PIN D0
 #define buzzer D1
+
 MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance.
-
-unsigned long previousMillis = 0;  // will store last time the RIFD was read
-unsigned long currentMillis;
-const long interval = 5000;  // interval at which to blink (milliseconds)
-String UID[4];
-
 Servo myservo;
 
+unsigned long previousMillis = 0;  // Will store last time the RIFD was read
+unsigned long currentMillis;
+const long interval = 5000;  // Interval at which to blink (milliseconds)
+const int keycards = 5;
+const int keycard_length = 11;
+String UID[keycards];  // Create placeholders for the RFID tags
+
 void setup() {
-  Serial.begin(115200);  // Initiate a serial communication
-  EEPROM.begin(5 * 11);   // Initiate EEPROM memory size
-  SPI.begin();           // Initiate  SPI bus
-  mfrc522.PCD_Init();    // Initiate MFRC522
+  Serial.begin(115200);                     // Initiate a serial communication
+  EEPROM.begin(keycards * keycard_length);  // Initiate EEPROM memory size
+  SPI.begin();                              // Initiate  SPI bus
+  mfrc522.PCD_Init();                       // Initiate MFRC522
   Serial.println("Approximate your card to the reader...");
   Serial.println();
 
-  myservo.attach(D4);  // attaches the servo on pin 9 to the servo object
-  move_servo(90);
-
+  myservo.attach(2, 500, 2400);  // Attaches the servo on pin D4 to the servo object
+  //close_door();
   pinMode(buzzer, OUTPUT);
-  //access_tone();
 
-  //UID[0] = "";
+  //UID[0] = "           ";
   //UID[1] = "50 48 B5 1E";
   //UID[2] = "0A 59 91 17";
   //UID[3] = "84 93 E4 52";
-  //UID[4] = "";
+  //UID[4] = "           ";
 
-  for (int i = 0; i < 5; i++){
-    //put_memory(UID[i], i);
+  for (int i = 0; i < keycards; i++) {
+    //manual_put_memory(UID[i], i);
   }
 
-  for (int i = 0; i < 5; i++){
+  // read the UID values from the memory
+  for (int i = 0; i < keycards; i++) {
     UID[i] = read_memory(i);
     Serial.println(UID[i]);
   }
+
+  //put_memory("17 48 43 4A");
 }
 
 void loop() {
-
   // Look for new cards
   if (!mfrc522.PICC_IsNewCardPresent()) {
     return;
@@ -62,12 +63,11 @@ void loop() {
   if (currentMillis - previousMillis > interval) {
     bool access_granted = false;
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < keycards; i++) {
       if (UID[i] == read_RFID()) {
         access_tone();
         access_granted = true;
       }
-
       Serial.println(UID[i]);
     }
 
@@ -95,22 +95,57 @@ String read_RFID() {
 
 String read_memory(int x) {
   String memory = "";
-  for (int i = 0; i < 11; i++) {
-    memory = String(memory + char(EEPROM.read(i + 11*x)));
+  for (int i = 0; i < keycard_length; i++) {
+    memory = String(memory + char(EEPROM.read(i + keycard_length * x)));
   }
   return memory;
 }
 
-void put_memory(String memory, int x) {
+void manual_put_memory(String memory, int x) {
   for (int i = 0; i < memory.length(); ++i) {
     Serial.print(memory[i]);
-    EEPROM.write(i + 11*x, memory[i]);
+    EEPROM.write(i + keycard_length * x, memory[i]);
   }
   EEPROM.commit();
 }
 
-void move_servo(int degree) {
-  myservo.write(degree);
+void put_memory(String memory) {
+  // Checks if the new UID to be saved is allready saved
+  for (int i = 0; i < keycards; i++) {
+    if (read_memory(i) == memory) {
+      return;
+    }
+  }
+  for (int i = 0; i < keycards; i++) {
+    if (read_memory(i) == "           ") {
+      for (int x = 0; x < memory.length(); ++x) {
+        Serial.print(memory[x]);
+        EEPROM.write(x + i * 11, memory[x]);
+      }
+      EEPROM.commit();
+      return;
+    }
+  }
+}
+
+void remove_memory(String memory) {
+  for (int i = 0; i < keycards; i++) {
+    if (read_memory(i) == memory) {
+      for (int x = 0; x < memory.length(); ++x) {
+        EEPROM.write(x + i * keycard_length, 32);
+      }
+      EEPROM.commit();
+    }
+  }
+}
+
+void reset_memory() {
+  for (int i = 0; i < keycards; i++) {
+    for (int x = 0; x < keycard_length; ++x) {
+      EEPROM.write(x + i * keycard_length, 32);
+    }
+  }
+  EEPROM.commit();
 }
 
 void access_tone() {
@@ -123,8 +158,11 @@ void access_tone() {
   noTone(buzzer);
   delay(800);
   tone(buzzer, 1396.91);
+  open_door();
   delay(300);
   noTone(buzzer);
+  delay(9700);
+  close_door();
 }
 
 void no_access_tone() {
@@ -135,4 +173,12 @@ void no_access_tone() {
   tone(buzzer, 830.61);
   delay(800);
   noTone(buzzer);
+}
+
+void open_door() {
+  myservo.write(0);
+}
+
+void close_door() {
+  myservo.write(90);
 }
