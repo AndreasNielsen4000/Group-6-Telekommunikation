@@ -18,7 +18,7 @@ Servo myservo;
 
 void setup() {
   Serial.begin(115200);  // Initiate a serial communication
-  EEPROM.begin(5 * 7);   // Initiate EEPROM memory size
+  EEPROM.begin(5 * 11);   // Initiate EEPROM memory size
   SPI.begin();           // Initiate  SPI bus
   mfrc522.PCD_Init();    // Initiate MFRC522
   Serial.println("Approximate your card to the reader...");
@@ -30,15 +30,20 @@ void setup() {
   pinMode(buzzer, OUTPUT);
   //access_tone();
 
+  //UID[0] = "";
   //UID[1] = "50 48 B5 1E";
   //UID[2] = "0A 59 91 17";
   //UID[3] = "84 93 E4 52";
+  //UID[4] = "";
 
-  //put_memory(UID);
-  //EEPROM.put(0,UID[1]);
-  EEPROM.get(0,UID[1]);
-  Serial.println(UID[1]);
-  //read_memory();
+  for (int i = 0; i < 5; i++){
+    //put_memory(UID[i], i);
+  }
+
+  for (int i = 0; i < 5; i++){
+    UID[i] = read_memory(i);
+    Serial.println(UID[i]);
+  }
 }
 
 void loop() {
@@ -88,20 +93,20 @@ String read_RFID() {
   return content.substring(1);  // return the UID
 }
 
-String *read_memory() {
-  static String memory[4];
-  for (int i = 0; i < 4; i++) {
-    EEPROM.get(i * 7, memory[i]);
+String read_memory(int x) {
+  String memory = "";
+  for (int i = 0; i < 11; i++) {
+    memory = String(memory + char(EEPROM.read(i + 11*x)));
   }
   return memory;
 }
 
-void put_memory(String memory[]) {
-  for (int i = 0; i < 4; i++) {
-    EEPROM.put(i * 7, memory[i]);
-    Serial.println(memory[i]);
+void put_memory(String memory, int x) {
+  for (int i = 0; i < memory.length(); ++i) {
+    Serial.print(memory[i]);
+    EEPROM.write(i + 11*x, memory[i]);
   }
-  bool ok1 = EEPROM.commit();
+  EEPROM.commit();
 }
 
 void move_servo(int degree) {
