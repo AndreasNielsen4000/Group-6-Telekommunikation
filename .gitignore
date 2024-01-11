@@ -1,0 +1,7 @@
+# vscode
+.vscode
+# build directory if you are compiling your code from vscode
+build/ 
+
+# node
+node_modules/
