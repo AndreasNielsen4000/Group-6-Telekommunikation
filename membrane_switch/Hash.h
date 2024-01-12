@@ -1,6 +1,7 @@
 /*
-  Simple hash function for passwords. At the moment, it just adds up the values of the characters in the password.
-  This is not a secure hash function, but it is good enough for this project.
+  Simple hash function for passwords. 
+  Uses the djb2 algorithm. https://theartincode.stanis.me/008-djb2/
+
 */
 #ifndef Hash_h
 #define Hash_h
@@ -9,10 +10,12 @@
 
 
 unsigned long hashPassword(const char* password) {
-    unsigned long hash = 0;
-    for (int i = 0; password[i] != '\0'; i++) {
-        hash += password[i];
-    }
+    unsigned long hash = 5381;
+    int c;
+
+    while (c = *password++)
+        hash = ((hash << 5) + hash) + c; // hash * 33 + c 
+
     return hash;
 }
 
