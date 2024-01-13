@@ -96,7 +96,7 @@ void loop() {
   bool passFound = false;
 
   if (messageHash != hashPassword("\0")) {
-    Serial2.println(password); //send password to ESP to open door
+    Serial2.println(messageHash); //send password to ESP to open door
   }
   /*
   for (int i = 0; i < NUM_USERS; i++) {
@@ -107,22 +107,27 @@ void loop() {
         }
   }
   */
-  if (strcmp(serialMessage, "access\r") == 0) {
-    passFound = true;
-  }
-  
-  //Serial.println(message);
+
   
   if (serialMessage[0] != '\0') {
-    // Split serial message into access boolean and user index
-    char *token = strtok(serialMessage, ",");
-    passFound = atoi(token);
-    token = strtok(NULL, ",");
-    userIndex = atoi(token);    // HERE START THE PROBLEM WE DIED
-    Serial.println("MESSAGE: ");
-    Serial.println(serialMessage);
-    updateStatus(passFound, userIndex);
+    if (serialMessage[0] != '\r') {
+      splitSerialMessage(serialMessage, &passFound, &userIndex);
+      Serial.println("MESSAGE: ");
+      Serial.println(serialMessage);
+      Serial.println("PASSFOUND: ");
+      Serial.println(passFound);
+      Serial.println("USERINDEX: ");
+      Serial.println(userIndex);
+      updateStatus(passFound, userIndex);
+    }
   }
+}
+
+void splitSerialMessage(char *serialMessage, bool *accessGranted, int *userIndex) {
+  char *token = strtok(serialMessage, ",");
+  *accessGranted = atoi(token);
+  token = strtok(NULL, ",");
+  *userIndex = atoi(token);
 }
 
 void mainMenuKeyPad(char *message, char *serialMessage) {
@@ -232,6 +237,8 @@ void adminMenuKeyPad(struct accessCredentials *credentialsList, char *serialMess
                 lcdDisplay.enterPasswordLCD("User");
                 mainMenuKeyPad(message, serialMessage);
                 credentialsList[userIndex].password = hashPassword(message);
+                //Send password, user index and hashed master password to ESP in one string separated by commas
+                Serial2.println(String(credentialsList[userIndex].password) + "," + String(userIndex) + "," + String(adminPassword));
                 updatePasswordList(credentialsList);
                 Serial.println("Password list after update master:");
                 for (int i = 0; i < NUM_USERS; i++) {
