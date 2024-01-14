@@ -145,11 +145,14 @@ void mainMenuKeyPad(char *message, char *serialMessage) {
         // If a key is pressed and is not #, add it to the message. 
         if (key != '#') {
           if (menuIndex == 1 && key == '*') {
+            menuIndex = 0;
             return;
           }
           if ((key == 'A' || key == 'B' || key == 'C' || key == '*')){ //Change here <- ignore letters 
             continue;
-          } else if ( key == 'D' ) { //If D is pressed, go to admin menu
+          } else if (key == 'D' && menuIndex != 0) { //If D is pressed in admin menu <- ignore letter
+            continue;
+          } else if ( key == 'D' && menuIndex == 0) { //If D is pressed in main manu, go to admin menu
             menuIndex = 1;
             adminMenuKeyPad(serialMessage);
             message_pos = 0;
@@ -183,7 +186,6 @@ void mainMenuKeyPad(char *message, char *serialMessage) {
 void adminMenuKeyPad(char *serialMessage) {
     lcdDisplay.enterPasswordLCD("Installer");  //LCD init for admin menu
     char message[MAX_MESSAGE_LENGTH]; //message init
-    static unsigned int message_pos = 0;
     int userIndex = 0;
 
     //read keypad for admin access
@@ -196,6 +198,7 @@ void adminMenuKeyPad(char *serialMessage) {
         lcdDisplay.printUserNameLCD(userIndex); 
     }
     else if (menuIndex != 2) {
+        menuIndex = 0;
         lcdDisplay.enterPasswordLCD("default");
         return;
     }
@@ -217,8 +220,6 @@ void adminMenuKeyPad(char *serialMessage) {
             // If a key is pressed and is not #, add it to the message. 
             if (key == '*') {
                 menuIndex = 0;
-                message_pos = 0;
-                message[message_pos] = '\0';
                 lcdDisplay.enterPasswordLCD("default");
             } else if (key == 'B') {
                 userIndex++;
@@ -235,10 +236,10 @@ void adminMenuKeyPad(char *serialMessage) {
             } else if (key == '#') {
                 lcdDisplay.enterPasswordLCD("User");
                 mainMenuKeyPad(message, serialMessage); // Enter new password for user
-                Serial2.println(String(hashPassword(message)) + "," + String(userIndex) + "," + String(adminPassword)); // send password and user index to other ESP
+                if (message[0] == '\0') {
+                  Serial2.println(String(hashPassword(message)) + "," + String(userIndex) + "," + String(adminPassword)); // send password and user index to other ESP
+                }
                 menuIndex = 0;
-                message_pos = 0;
-                message[message_pos] = '\0';
             }
         }
     }
