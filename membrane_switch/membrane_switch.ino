@@ -2,6 +2,10 @@
 #include "Hash.h"
 #include "lcd_display.h"
 #include "led_control.h"
+//*************************** TEST ***************************
+#include <BleSerial.h>
+//************************************************************
+
 
 // Constants
 #define MAX_MESSAGE_LENGTH 9
@@ -22,6 +26,9 @@ const int buzzerPin = 5;
 int menuIndex = 0;
 int userIndex = 0;
 
+//***************************** TEST ***************************
+BleSerial SerialBT;
+//************************************************************
 
 // Struct for storing access credentials
 /*
@@ -78,6 +85,10 @@ led_control ledControl(PIN_RED, PIN_GREEN, PIN_BLUE, PIN_LIGHT, LDRPin, buzzerPi
 void setup() {
   Serial.begin(115200);
   Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2);
+  //************** TEST *******************
+  SerialBT.begin("KeypadBT"); //Bluetooth device name
+  Serial.println("The device started, now you can pair it with bluetooth!");
+  //****************************************
   lcdDisplay.init();
   lcdDisplay.enterPasswordLCD("default"); //initial menu on lcd
   ledControl.init();
@@ -98,10 +109,16 @@ void loop() {
   
   unsigned long messageHash = hashPassword(message);   
   ledControl.controlLED(0); //Set LED to idle status
-
+  //******************* TEST ********************
+  if (SerialBT.available()) {
+    messageHash = hashPassword(SerialBT.readStringUntil('\n').c_str());
+    SerialBT.println("Received");
+  }
+  //*********************************************
   if (messageHash != hashPassword("\0")) {
     Serial2.println(messageHash); //send password to ESP to open door
   }
+
   
   if (serialMessage[0] != '\0' && serialMessage[0] != '\r') {
     splitSerialMessage(serialMessage, &passFound, &userIndex);
@@ -134,6 +151,22 @@ void mainMenuKeyPad(char *message, char *serialMessage) {
         Serial.println("Serial message received in mainMenuKeyPad()");
         return;
       }
+      
+      //******************* TEST ********************
+      if (SerialBT.available()) {
+        String temp = SerialBT.readStringUntil('\n');
+        temp.toCharArray(message, temp.length() + 1);
+        if (message_pos > 0) {
+            message[message_pos] = '\0';
+            message_pos = 0;
+            keyReceived = true;
+        }
+        Serial.println("Serial BT message received in mainMenuKeyPad()");
+        SerialBT.println("Received");
+        return;
+      }
+      //*********************************************
+
       char key = keypad.getKey();
       ledControl.readLightSensor();
       if (key) {
