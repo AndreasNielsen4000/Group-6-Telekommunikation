@@ -149,7 +149,7 @@ void lcd_display::passTooLongLCD() {
 }
 
 
-void lcd_display::printUserNameLCD(struct accessCredentials *credentialsList, int userIndex) {
+void lcd_display::printUserNameLCD(int userIndex) {
   lcd.clear();                 // clear display
   lcd.setCursor(0, 0);         // move cursor to   (0, 0)
   lcd.print("User "); // print message at (0, 0)

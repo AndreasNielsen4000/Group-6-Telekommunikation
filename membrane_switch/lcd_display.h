@@ -20,7 +20,7 @@ public:
     void wrongPasswordLCD();
     void accessGrantedLCD(int userIndex);
     void passTooLongLCD();
-    void printUserNameLCD(struct accessCredentials *credentialsList, int userIndex);
+    void printUserNameLCD(int userIndex);
 };
 
 
