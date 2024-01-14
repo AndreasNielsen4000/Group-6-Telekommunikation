@@ -236,7 +236,7 @@ void adminMenuKeyPad(char *serialMessage) {
             } else if (key == '#') {
                 lcdDisplay.enterPasswordLCD("User");
                 mainMenuKeyPad(message, serialMessage); // Enter new password for user
-                if (message[0] == '\0') {
+                if (message[0] != '\0') {
                   Serial2.println(String(hashPassword(message)) + "," + String(userIndex) + "," + String(adminPassword)); // send password and user index to other ESP
                 }
                 menuIndex = 0;

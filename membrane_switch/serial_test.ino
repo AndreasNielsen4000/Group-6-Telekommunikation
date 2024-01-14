@@ -44,6 +44,7 @@ void loop(){
     
     if (Serial2.available()) {
         Serial2.readBytesUntil('\n', input, MAX_MESSAGE_LENGTH);
+        Serial.println(input);
         splitSerialMessage(input, &receivedPassword, &receivedUserIndex);
         if (receivedUserIndex < 0) {
             for (int i = 0; i < NUM_USERS; i++) {
@@ -74,32 +75,18 @@ void loop(){
 
 
 void splitSerialMessage(char *serialMessage, unsigned long *password, int *userIndex) {
-  char *token = strtok(serialMessage, ",");
-  char *endPointer;
-  *password = strtoul(token, &endPointer, 10);
-  //if we only receive password and no communication from ESP, set userIndex to -1
+    char *token = strtok(serialMessage, ",");
+    *password = strtoul(token, NULL, 10);
+    
+    token = strtok(NULL, ",");
     if (token == NULL) {
         *userIndex = -1;
         return;
-    } else { //if we receive a comma, should receive a user index and a hashed master password, we should check if the master password is correct. If it is correct, return password and user index.
-        token = strtok(NULL, ",");
-        if (token == NULL) {
-            *userIndex = -1;
-            return;
-        } else {
-            *userIndex = atoi(token);
-            token = strtok(NULL, ",");
-            if (token == NULL) {
-                *userIndex = -1;
-                return;
-            } else {
-                if (strtoul(token, &endPointer, 10) == masterPassword) {
-                    return;
-                } else {
-                    *userIndex = -1;
-                    return;
-                }
-            }
-        }
+    }
+    
+    *userIndex = atoi(token);
+    token = strtok(NULL, ",");
+    if (token == NULL || strtoul(token, NULL, 10) != masterPassword) {
+        *userIndex = -1;
     }
 }
