@@ -2,10 +2,7 @@
 #include "Hash.h"
 #include "lcd_display.h"
 #include "led_control.h"
-//*************************** TEST ***************************
 #include <BleSerial.h>
-//************************************************************
-
 
 // Constants
 #define MAX_MESSAGE_LENGTH 9
@@ -14,7 +11,7 @@
 #define RXD2 13 //define RX pin for serial2 communication (between ESPs)
 #define TXD2 15 //define TX pin for serial2 communication (between ESPs)
 
-// Pins
+// Pins for LED, light sensor and buzzer
 const int PIN_RED   = 4;
 const int PIN_GREEN = 14;
 const int PIN_BLUE  = 27;
@@ -26,29 +23,12 @@ const int buzzerPin = 5;
 int menuIndex = 0;
 int userIndex = 0;
 
-//***************************** TEST ***************************
-BleSerial SerialBT;
-//************************************************************
-
-// Struct for storing access credentials
-/*
-typedef struct accessCredentials
-{
-    unsigned long password;
-    char username[15];
-};
-*/
 // Function declarations
-/*
-void updatePasswordList(accessCredentials *credentialsList);
-void cleanAccessCredentials(accessCredentials *credentialsList);
-*/
 void adminMenuKeyPad(char *serialMessage);
 
 // Rows and columns for keypad and keypad initialization
 const int ROW_NUM = 4; 
 const int COLUMN_NUM = 4;
-
 
 char keys[ROW_NUM][COLUMN_NUM] = {
   {'1','2','3', 'A'},
@@ -65,21 +45,10 @@ Keypad keypad = Keypad( makeKeymap(keys), pin_rows, pin_column, ROW_NUM, COLUMN_
 // Master password for admin access
 unsigned long adminPassword = hashPassword("12345678");
 
-// Credentials list manual 
-/*
-accessCredentials credentialsList[NUM_USERS] = {
-        {hashPassword("1234"), "user1"},
-        {hashPassword("\0"), "user2"},
-        {hashPassword("\0"), "user3"},
-        {hashPassword("\0"), "user4"},
-        {hashPassword("\0"), "user5"},
-};
-*/
-
-
-// Object declarations for LCD display and LED control
+// Object declarations for LCD display, LED control and Bluetooth serial communication
 lcd_display lcdDisplay;
 led_control ledControl(PIN_RED, PIN_GREEN, PIN_BLUE, PIN_LIGHT, LDRPin, buzzerPin);
+BleSerial SerialBT;
 
 //Setup function for Arduino
 void setup() {
@@ -100,26 +69,31 @@ void loop() {
   char serialMessage[MAX_SERIAL_MESSAGE_LENGTH] = {'\0'}; //message array for serial input
   bool passFound = false; //bool for checking if password is found
 
+  //Serial communication check
   if (Serial2.available()) {
       Serial2.readBytesUntil('\n', serialMessage, MAX_SERIAL_MESSAGE_LENGTH);
       Serial.println("Serial message received in loop()");
       return;
   }
-  mainMenuKeyPad(message, serialMessage); //Start main menu keypad function, returns message array from keypad input
-  
-  unsigned long messageHash = hashPassword(message);   
-  ledControl.controlLED(0); //Set LED to idle status
-  //******************* TEST ********************
+
+  //Bluetooth communication check
   if (SerialBT.available()) {
     messageHash = hashPassword(SerialBT.readStringUntil('\n').c_str());
     SerialBT.println("Received");
   }
-  //*********************************************
+
+   //Start main menu keypad function, changes the message array with keypad inputs
+  mainMenuKeyPad(message, serialMessage);
+  
+  unsigned long messageHash = hashPassword(message);   
+  ledControl.controlLED(0); //Set LED to idle status
+  
+  //If messageHash is not equal to the hash of an empty string, send the password to the other ESP through serial
   if (messageHash != hashPassword("\0")) {
     Serial2.println(messageHash); //send password to ESP to open door
   }
 
-  
+  // If serialMessage is not empty, split the serial message from other ESP into message, accessGranted and userIndex
   if (serialMessage[0] != '\0' && serialMessage[0] != '\r') {
     splitSerialMessage(serialMessage, &passFound, &userIndex);
     Serial.println("MESSAGE: ");
@@ -128,10 +102,11 @@ void loop() {
     Serial.println(passFound);
     Serial.println("USERINDEX: ");
     Serial.println(userIndex);
-    updateStatus(passFound, userIndex);
+    updateStatus(passFound, userIndex); //Gives feedback to user if password is correct or not through LED and LCD
   }
 }
 
+//Function for splitting serial message into accessGranted and userIndex
 void splitSerialMessage(char *serialMessage, bool *accessGranted, int *userIndex) {
   char *token = strtok(serialMessage, ",");
   *accessGranted = atoi(token);
@@ -144,15 +119,17 @@ void mainMenuKeyPad(char *message, char *serialMessage) {
     static unsigned int message_pos = 0;
     bool keyReceived = false;
     
-    // Read the keypad until a # character is received.
+    //Checking for keypad input, serial input and bluetooth input
     while (!keyReceived) {
+
+      //Serial communication check
       if (Serial2.available()) {
         Serial2.readBytesUntil('\n', serialMessage, MAX_SERIAL_MESSAGE_LENGTH);
         Serial.println("Serial message received in mainMenuKeyPad()");
         return;
       }
       
-      //******************* TEST ********************
+      //Bluetooth communication check
       if (SerialBT.available()) {
         String temp = SerialBT.readStringUntil('\n');
         temp.toCharArray(message, temp.length() + 1);
@@ -165,10 +142,10 @@ void mainMenuKeyPad(char *message, char *serialMessage) {
         SerialBT.println("Received");
         return;
       }
-      //*********************************************
 
-      char key = keypad.getKey();
-      ledControl.readLightSensor();
+      char key = keypad.getKey(); //Read keypad input
+      ledControl.readLightSensor(); //Control light sensor
+
       if (key) {
         ledControl.keyPressLED();
         // If a key is pressed and is not #, add it to the message. 
@@ -178,7 +155,7 @@ void mainMenuKeyPad(char *message, char *serialMessage) {
           }
           if ((key == 'A' || key == 'B' || key == 'C' || key == '*')){ //Change here <- ignore letters 
             continue;
-          } else if ( key == 'D' ) {
+          } else if ( key == 'D' ) { //If D is pressed, go to admin menu
             menuIndex = 1;
             adminMenuKeyPad(serialMessage);
             message_pos = 0;
@@ -192,6 +169,7 @@ void mainMenuKeyPad(char *message, char *serialMessage) {
               message_pos = 0;
               message[message_pos] = '\0';
               updateStatus(false, 0);
+              return;
             }
           }
         } else {
@@ -209,19 +187,16 @@ void mainMenuKeyPad(char *message, char *serialMessage) {
 
 
 void adminMenuKeyPad(char *serialMessage) {
-    //LCD init
-    lcdDisplay.enterPasswordLCD("Installer");
-    //message init
-    char message[MAX_MESSAGE_LENGTH];
+    lcdDisplay.enterPasswordLCD("Installer");  //LCD init for admin menu
+    char message[MAX_MESSAGE_LENGTH]; //message init
     static unsigned int message_pos = 0;
+    int userIndex = 0;
 
     //read keypad for admin access
     mainMenuKeyPad(message, serialMessage);
-    
     unsigned long messageHash = hashPassword(message);
 
-    //check if admin access is granted
-    int userIndex = 0;
+    //check if admin access is granted, if not, return to main menu
     if (messageHash == adminPassword) {
         menuIndex = 2;
         lcdDisplay.printUserNameLCD(userIndex); 
@@ -230,14 +205,19 @@ void adminMenuKeyPad(char *serialMessage) {
         lcdDisplay.enterPasswordLCD("default");
         return;
     }
+    //If access is granted, read keypad for admin menu
     while (menuIndex == 2) {
+        //Serial communication check
         if (Serial2.available()) {
           Serial2.readBytesUntil('\n', serialMessage, MAX_SERIAL_MESSAGE_LENGTH);
           Serial.println("Serial message received in adminMenuKeyPad()");
           return;
         }
+
+        //admin menu keypad control
         char key = keypad.getKey();
         ledControl.readLightSensor();
+        // Select user to change password for, * to quit, # to confirm, B and C to change user
         if (key) {
             ledControl.keyPressLED();
             // If a key is pressed and is not #, add it to the message. 
@@ -260,57 +240,15 @@ void adminMenuKeyPad(char *serialMessage) {
                 lcdDisplay.printUserNameLCD(userIndex);
             } else if (key == '#') {
                 lcdDisplay.enterPasswordLCD("User");
-                mainMenuKeyPad(message, serialMessage);
-                //credentialsList[userIndex].password = hashPassword(message); // SKAL VEL IKKE BRUGES LÆNGERE
-                //Send password, user index and hashed master password to ESP in one string separated by commas
-                Serial2.println(String(hashPassword(message)) + "," + String(userIndex) + "," + String(adminPassword));
-                //updatePasswordList(credentialsList); // HELLERE IKKE BRUGES LÆNGERE!!
+                mainMenuKeyPad(message, serialMessage); // Enter new password for user
+                Serial2.println(String(hashPassword(message)) + "," + String(userIndex) + "," + String(adminPassword)); // send password and user index to other ESP
                 menuIndex = 0;
                 message_pos = 0;
                 message[message_pos] = '\0';
-            } else {  
-                message[message_pos] = key;
-                message_pos++;
-                lcdDisplay.updatePasswordLCD();
-                // if message is too long, reset the message, start over, warning!.
-                if (message_pos >= MAX_MESSAGE_LENGTH) {
-                    message_pos = 0;
-                    message[message_pos] = '\0';
-                    updateStatus(false, 0);
-                }
             }
         }
     }
 }
-/*
-lav struct tempCredentialsList (som global) og gem EEPROM i credentialsList. 
-Programmet skriver alt aktivt i tempCredentialsList og gemmer i EEPROM hvis credentialsList ikke er lig tempCredentialsList.
-*/
-
-// VI SKAL DA IKKE BRUGE DEN HER LÆNGERE!!??
-/*
-void updatePasswordList(struct accessCredentials *credentialsList) {
-
-    accessCredentials tempCredentialsList[NUM_USERS];
-
-    memcpy(tempCredentialsList, credentialsList, sizeof(accessCredentials) * NUM_USERS);
-
-    cleanAccessCredentials(credentialsList);
-
-    for (int i = 0; i < NUM_USERS; i++) {
-      if (tempCredentialsList[i].password != '\0')
-          credentialsList[i] = tempCredentialsList[i];
-    }
-}
-
-void cleanAccessCredentials(struct accessCredentials *credentialsList) {
-    accessCredentials credentialsReset = {'\0', ""};
-
-    for (int i = 0; i < NUM_USERS; i++) {
-      credentialsList[i] = credentialsReset;
-    }
-}
-*/
 
 
 void updateStatus(bool accessGranted, int userIndex) {
