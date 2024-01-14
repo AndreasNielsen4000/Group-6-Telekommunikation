@@ -76,13 +76,7 @@ void loop() {
       return;
   }
 
-  //Bluetooth communication check
-  if (SerialBT.available()) {
-    messageHash = hashPassword(SerialBT.readStringUntil('\n').c_str());
-    SerialBT.println("Received");
-  }
-
-   //Start main menu keypad function, changes the message array with keypad inputs
+  //Start main menu keypad function, changes the message array with keypad inputs
   mainMenuKeyPad(message, serialMessage);
   
   unsigned long messageHash = hashPassword(message);   
