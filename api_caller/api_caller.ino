@@ -5,6 +5,8 @@
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 
+/* Example ino file - calling server*/
+
 const char *ssid = "";   /* Your SSID */
 const char *pass = "";   /* Your Password */
 const char *apiUrl = ""; /* Your API URL. Example: "https://api.example.com" */
@@ -53,7 +55,7 @@ void loop()
 
     // Call the API with a pin
     String pin = "1234";
-    std::unique_ptr<DynamicJsonDocument> doc = apiCaller.call("/pin", pin);
+    std::unique_ptr<DynamicJsonDocument> doc = apiCaller.GET("/pin", pin);
 
     // Check if the API call was successful.
     if (doc == nullptr)
@@ -65,13 +67,13 @@ void loop()
 
     if (doc->containsKey("authenticated"))
     {
-        if (doc->get<bool>("authenticated"))
+        if ((*doc)["authenticated"].as<bool>())
         {
             Serial.println("API call was successful and the pin was correct.");
 
             // Get the value of the "message" key.
             // TODO: check if the key exists before getting the value.
-            String message = doc->get<String>("message");
+            String message = (*doc)["message"].as<String>();
             Serial.println(message);
         }
         else

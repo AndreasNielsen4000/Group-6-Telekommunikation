@@ -21,7 +21,7 @@ ApiCaller::ApiCaller(WiFiClient &client, String apiUrl) : client(client), apiUrl
  * @param value The value to be passed to the endpoint.
  * @return A unique_ptr to a DynamicJsonDocument containing the response, or nullptr if an error occurs.
  */
-std::unique_ptr<DynamicJsonDocument> ApiCaller::call(String endpoint, String value)
+std::unique_ptr<DynamicJsonDocument> ApiCaller::GET(String endpoint, String value)
 {
 // TODO: check if there is a "/" in between all values
 #include <string>

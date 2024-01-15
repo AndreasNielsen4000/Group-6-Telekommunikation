@@ -21,11 +21,8 @@ ApiCaller::ApiCaller(WiFiClient &client, String apiUrl) : client(client), apiUrl
  * @param value The value to be passed to the endpoint.
  * @return A unique_ptr to a DynamicJsonDocument containing the response, or nullptr if an error occurs.
  */
-std::unique_ptr<DynamicJsonDocument> ApiCaller::call(String endpoint, String value)
+std::unique_ptr<DynamicJsonDocument> ApiCaller::GET(String endpoint, String value)
 {
-// TODO: check if there is a "/" in between all values
-#include <string>
-
     String url = this->format_url(this->apiUrl + "/" + endpoint + "/" + value);
 
     Serial.print("Calling API: ");
@@ -79,8 +76,65 @@ std::unique_ptr<DynamicJsonDocument> ApiCaller::call(String endpoint, String val
     }
 }
 
+std::unique_ptr<DynamicJsonDocument> ApiCaller::PUT(String endpoint, String id, String value)
+{
+    String url = this->format_url(this->apiUrl + "/" + endpoint + "/" + id + "/" + value);
+
+    Serial.print("Calling API: ");
+    Serial.println(url);
+
+    HTTPClient https;
+
+    https.begin(client, url.c_str());
+    https.addHeader("Content-Type", "application/json");
+
+    int httpCode = https.PUT(value);
+    if (httpCode <= 0)
+    {
+        Serial.println("Error on HTTP request");
+        return nullptr;
+    }
+
+    String payload = https.getString();
+    // TODO: figure out how big DynamicJsonDocument should be
+    std::unique_ptr<DynamicJsonDocument> doc = std::make_unique<DynamicJsonDocument>(payload.length() * 2);
+
+    // cleanup the https connection
+    https.end();
+
+    // deserialize the JSON payload
+    DeserializationError jsonError = deserializeJson(*doc, payload);
+    
+    switch (jsonError.code())
+    {  
+    case DeserializationError::Code::Ok:
+        Serial.println("Deserialization of JSON was successful");
+        return doc;
+    case DeserializationError::Code::EmptyInput:
+        Serial.println("Error: Empty input to JSON deserialization");
+        return nullptr;
+    case DeserializationError::Code::IncompleteInput:
+        Serial.println("Error: Incomplete JSON input");
+        return nullptr;
+    case DeserializationError::Code::InvalidInput:
+        Serial.println("Error: Invalid JSON input");
+        return nullptr;
+    case DeserializationError::Code::NoMemory:
+        Serial.println("Error: No memory");
+        return nullptr;
+    case DeserializationError::Code::TooDeep:
+        Serial.println("Error: JSON object too deep");
+        return nullptr;
+    default:
+        Serial.println("Error: Unknown error");
+        return nullptr;
+    }
+
+}
+
 /*
  * Formats a URL by removing any double slashes.
+ *
  * @param url The URL to be formatted.
  * @return The formatted URL.
  */
