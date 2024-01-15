@@ -94,15 +94,19 @@ void loop() {
         Serial.readBytesUntil('\n', serialInput, MAX_MESSAGE_LENGTH);
         //Serial.println(serialInput);
         splitSerialMessage(serialInput, &receivedPasswordSerial, &receivedUserIndexSerial);
+        bool accessGranted = false;
         if (receivedUserIndexSerial < 0) {
             for (int i = 0; i < NUM_USERS; i++) {
                 if (users[i].pin == receivedPasswordSerial) {
+                    accessGranted = true;
                     Serial.println("1," + String(i));
                     access_tone();
                     break;
                 } 
             }
-            Serial.println("0,-1");
+            if (accessGranted == false){
+              Serial.println("0,-10");
+            }
         } else if (receivedUserIndexSerial < NUM_USERS && receivedUserIndexSerial >= 0) {
             users[receivedUserIndexSerial].pin = receivedPasswordSerial; //update password
         } else {

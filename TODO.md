@@ -7,6 +7,6 @@
 - [ ] Right now the header files all need to be in `Libaries` root. Fix this...
 
 ---
-rfid
 
-- [ ] 
+Api todo
+- [ ] Check if api pin or rfid is diffrenet that stored on bord and overwrite if it is

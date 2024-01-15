@@ -14,9 +14,9 @@ void led_control::init() {
   pinMode(PIN_LIGHT, OUTPUT);
   pinMode(LDRPin, INPUT);
   pinMode(buzzerPin, OUTPUT);
-  tone(buzzerPin, 698, 200);
-  delay(100);
-  tone(buzzerPin, 698, 200);
+  //tone(buzzerPin, 698, 200);
+  //delay(100);
+  //tone(buzzerPin, 698, 200);
 }
 
 void led_control::controlLED(int status) {
@@ -75,8 +75,6 @@ void led_control::readLightSensor() {
 void led_control::keyPressLED() {
     tone(buzzerPin, 698, 20);
     controlLED(9);
-
-    
     delay(20);
     controlLED(0);
 }

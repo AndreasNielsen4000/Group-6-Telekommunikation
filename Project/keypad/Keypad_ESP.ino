@@ -119,8 +119,13 @@ void mainMenuKeyPad(char *message, char *serialMessage) {
       //Serial communication check
       if (Serial2.available()) {
         Serial2.readBytesUntil('\n', serialMessage, MAX_SERIAL_MESSAGE_LENGTH);
-        Serial.println(serialMessage);
+        if (message_pos > 0) {
+          message_pos = 0;
+          message[message_pos] = '\0';
+        }
         Serial.println("Serial message received in mainMenuKeyPad()");
+        Serial.println("serialMessage");
+        Serial.println(serialMessage);
         return;
       }
       
