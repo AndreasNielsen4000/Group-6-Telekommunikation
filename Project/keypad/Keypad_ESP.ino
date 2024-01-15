@@ -1,3 +1,10 @@
+/*
+  Keypad_ESP.ino - This file contains the code for an ESP-based keypad system.
+  It includes functionality for keypad input, LCD display, LED control, and serial communication between ESPs.
+  It is meant to be used with and ESP32 and communicates with another ESP through serial communication.
+  Created by Alexander Nordentoft (s176361) and Andreas Nielsen (s203833), January 2024.
+*/
+
 #include <Keypad.h>
 #include "Hash.h"
 #include "lcd_display.h"
@@ -6,18 +13,23 @@
 
 // Constants
 #define MAX_MESSAGE_LENGTH 9
-#define MAX_SERIAL_MESSAGE_LENGTH 50
+#define MAX_SERIAL_MESSAGE_LENGTH 32
 #define NUM_USERS 5
 #define RXD2 13 //define RX pin for serial2 communication (between ESPs)
 #define TXD2 15 //define TX pin for serial2 communication (between ESPs)
-
 // Pins for LED, light sensor and buzzer
-const int PIN_RED   = 4;
-const int PIN_GREEN = 14;
-const int PIN_BLUE  = 27;
-const int PIN_LIGHT = 23;
-const int LDRPin = 36;
-const int buzzerPin = 5;
+#define RED_LED 4
+#define GREEN_LED 14
+#define BLUE_LED 27
+#define WHITE_LED 23
+#define LDR_PIN 36
+#define BUZZER_PIN 5
+// Rows and columns for keypad and keypad initialization
+#define ROW_NUM 4 
+#define COLUMN_NUM 4
+//Keypad setup created with help from: https://arduinogetstarted.com/tutorials/arduino-keypad
+byte rowPins[ROW_NUM] = {16, 17, 18, 19}; //connect to the row pinouts of the keypad
+byte columnPins[COLUMN_NUM] = {25, 26, 32, 33}; //connect to the column pinouts of the keypad
 
 // Variables for user and menu index
 int menuIndex = 0;
@@ -26,23 +38,17 @@ int userIndex = 0;
 // Function declarations
 void adminMenuKeyPad(char *serialMessage);
 
-// Rows and columns for keypad and keypad initialization
-const int ROW_NUM = 4; 
-const int COLUMN_NUM = 4;
-
-char keys[ROW_NUM][COLUMN_NUM] = {
+char keypadKeys[ROW_NUM][COLUMN_NUM] = {
   {'1','2','3', 'A'},
   {'4','5','6', 'B'},
   {'7','8','9', 'C'},
   {'*','0','#', 'D'}
 };
 
-byte pin_rows[ROW_NUM] = {16, 17, 18, 19}; //connect to the row pinouts of the keypad
-byte pin_column[COLUMN_NUM] = {25, 26, 32, 33}; //connect to the column pinouts of the keypad
 
-Keypad keypad = Keypad( makeKeymap(keys), pin_rows, pin_column, ROW_NUM, COLUMN_NUM );
+Keypad keypad = Keypad( makeKeymap(keypadKeys), rowPins, columnPins, ROW_NUM, COLUMN_NUM );
 
-// Master password for admin access
+// Password for admin access
 unsigned long adminPassword = hashPassword("12345678");
 
 // Object declarations for LCD display, LED control and Bluetooth serial communication
@@ -54,10 +60,8 @@ BleSerial SerialBT;
 void setup() {
   Serial.begin(115200);
   Serial2.begin(115200, SERIAL_8N1, RXD2, TXD2);
-  //************** TEST *******************
   SerialBT.begin("KeypadBT"); //Bluetooth device name
   Serial.println("The device started, now you can pair it with bluetooth!");
-  //****************************************
   lcdDisplay.init();
   lcdDisplay.enterPasswordLCD("default"); //initial menu on lcd
   ledControl.init();
@@ -69,12 +73,13 @@ void loop() {
   char serialMessage[MAX_SERIAL_MESSAGE_LENGTH] = {'\0'}; //message array for serial input
   bool passFound = false; //bool for checking if password is found
 
-  //Serial communication check
+  /*  //Serial communication check
   if (Serial2.available()) {
       Serial2.readBytesUntil('\n', serialMessage, MAX_SERIAL_MESSAGE_LENGTH);
       Serial.println("Serial message received in loop()");
       return;
-  }
+  } */
+
 
   //Start main menu keypad function, changes the message array with keypad inputs
   mainMenuKeyPad(message, serialMessage);
@@ -87,7 +92,7 @@ void loop() {
     Serial2.println(messageHash); //send password to ESP to open door
   }
 
-  // If serialMessage is not empty, split the serial message from other ESP into message, accessGranted and userIndex
+  // If serialMessage is not empty, split the serial message from other ESP into message, accessGranted and userIndex, serial prints for debugging
   if (serialMessage[0] != '\0' && serialMessage[0] != '\r') {
     splitSerialMessage(serialMessage, &passFound, &userIndex);
     Serial.println("MESSAGE: ");
@@ -108,39 +113,55 @@ void splitSerialMessage(char *serialMessage, bool *accessGranted, int *userIndex
   *userIndex = atoi(token);
 }
 
+
+/**
+ * mainMenuKeyPad reads the keypad input in the main menu and performs actions based on the input.
+ * It allows for the user to enter a password and send it to the other ESP through serial communication.
+ * It also allows for the user to enter the admin menu by pressing D.
+ * If the admin menu is entered, the adminMenuKeyPad function is called.
+ * 
+ * Parameters:
+ *  - message A pointer to the message buffer.
+ *  - serialMessage A pointer to the serial message buffer.
+ */
 void mainMenuKeyPad(char *message, char *serialMessage) {
     //int to keep track of the position in the message array
-    static unsigned int message_pos = 0;
+    static unsigned int messagePos = 0;
     bool keyReceived = false;
     
     //Checking for keypad input, serial input and bluetooth input
     while (!keyReceived) {
 
-      //Serial communication check
-      if (Serial2.available()) {
-        Serial2.readBytesUntil('\n', serialMessage, MAX_SERIAL_MESSAGE_LENGTH);
-        if (message_pos > 0) {
-          message_pos = 0;
-          message[message_pos] = '\0';
+      //If there is data available to read from the serial port, read it into the serial message buffer and exit the function
+      if (checkSerialCommunication(serialMessage)) {
+        if (messagePos > 0) {
+          messagePos = 0;
+          message[messagePos] = '\0';
         }
-        Serial.println("Serial message received in mainMenuKeyPad()");
-        Serial.println("serialMessage");
-        Serial.println(serialMessage);
         return;
       }
+
       
-      //Bluetooth communication check
+      // Check if there is data available to read from the Bluetooth serial
       if (SerialBT.available()) {
+        // Read the incoming data until a newline character is encountered
         String temp = SerialBT.readStringUntil('\n');
+        // Convert the read String into a character array and store it in 'message'
         temp.toCharArray(message, temp.length() + 1);
-        if (message_pos > 0) {
-            message[message_pos] = '\0';
-            message_pos = 0;
+        // If there is a message position, null-terminate the message at that position
+        // and reset the message position
+        if (messagePos > 0) {
+            message[messagePos] = '\0';
+            messagePos = 0;
+            // Set the flag to indicate a key has been received
             keyReceived = true;
         }
+        // Print a debug message to the serial monitor
         Serial.println("Serial BT message received in mainMenuKeyPad()");
+        // Send a confirmation message back over Bluetooth serial
         SerialBT.println("Received");
-        return;
+        // Exit the function early since a key has been received
+          return;
       }
 
       char key = keypad.getKey(); //Read keypad input
@@ -161,25 +182,25 @@ void mainMenuKeyPad(char *message, char *serialMessage) {
           } else if ( key == 'D' && menuIndex == 0) { //If D is pressed in main manu, go to admin menu
             menuIndex = 1;
             adminMenuKeyPad(serialMessage);
-            message_pos = 0;
-            message[message_pos] = '\0';
+            messagePos = 0;
+            message[messagePos] = '\0';
           } else {  
-            message[message_pos] = key;
-            message_pos++;
+            message[messagePos] = key;
+            messagePos++;
             lcdDisplay.updatePasswordLCD();
             // if message is too long, reset the message, start over, warning!.
-            if (message_pos >= MAX_MESSAGE_LENGTH) {
-              message_pos = 0;
-              message[message_pos] = '\0';
+            if (messagePos >= MAX_MESSAGE_LENGTH) {
+              messagePos = 0;
+              message[messagePos] = '\0';
               updateStatus(false, 0);
               return;
             }
           }
         } else {
           // If # is pressed, end the message and reset the message position.
-          if (message_pos > 0) {
-            message[message_pos] = '\0';
-            message_pos = 0;
+          if (messagePos > 0) {
+            message[messagePos] = '\0';
+            messagePos = 0;
             keyReceived = true;
             lcdDisplay.enterPasswordLCD("default");
           }
@@ -188,7 +209,15 @@ void mainMenuKeyPad(char *message, char *serialMessage) {
     }
 }
 
-
+/**
+ * adminMenuKeyPad reads the keypad input in the admin menu and performs actions based on the input.
+ * If a valid admin password is entered, the admin menu is entered.
+ * It allows for the admin to select a user to change the password for.
+ * If a new password is entered, it is sent to the other ESP through serial communication.
+ * 
+ * Parameters:
+ *  - serialMessage A pointer to the serial message buffer to handle received serial messages from the other ESP while in the admin menu
+ */
 void adminMenuKeyPad(char *serialMessage) {
     lcdDisplay.enterPasswordLCD("Installer");  //LCD init for admin menu
     char message[MAX_MESSAGE_LENGTH]; //message init
@@ -210,10 +239,8 @@ void adminMenuKeyPad(char *serialMessage) {
     }
     //If access is granted, read keypad for admin menu
     while (menuIndex == 2) {
-        //Serial communication check
-        if (Serial2.available()) {
-          Serial2.readBytesUntil('\n', serialMessage, MAX_SERIAL_MESSAGE_LENGTH);
-          Serial.println("Serial message received in adminMenuKeyPad()");
+        //If there is data available to read from the serial port, read it into the serial message buffer and exit the function
+        if (checkSerialCommunication(serialMessage)) {
           return;
         }
 
@@ -251,7 +278,14 @@ void adminMenuKeyPad(char *serialMessage) {
     }
 }
 
-
+/**
+ * updateStatus function updates the LED and LCD display based on whether access was granted.
+ * It also prints a message to the serial monitor indicating whether the password was correct.
+ * 
+ * Parameters:
+ *  - accessGranted A boolean indicating whether access was granted.
+ *  - userIndex The index of the user for whom access was granted or denied.
+ */
 void updateStatus(bool accessGranted, int userIndex) {
   if (accessGranted){
     ledControl.controlLED(1);
@@ -267,4 +301,24 @@ void updateStatus(bool accessGranted, int userIndex) {
     lcdDisplay.enterPasswordLCD("default");
     ledControl.controlLED(0);
   }
+}
+
+
+/**
+ * checkSerialCommunication checks if there is data available to read from the serial port.
+ * If data is available, it reads the incoming message until a newline character is encountered.
+ * It then prints a debug message to the serial monitor.
+ * 
+ * Parameters:
+ * - serialMessage A pointer to the serial message buffer.
+ * Returns: 
+ * - true if a message was received, false otherwise.
+ */
+bool checkSerialCommunication(char* serialMessage) {
+    if (Serial2.available()) {
+        Serial2.readBytesUntil('\n', serialMessage, MAX_SERIAL_MESSAGE_LENGTH);
+        Serial.println("Serial2 message received.");
+        return true;
+    }
+    return false;
 }

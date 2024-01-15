@@ -77,7 +77,7 @@ void loop() {
   unsigned long receivedPasswordSerial = 0;
   int receivedUserIndexSerial = -1;
 
-  readSerial(serialInput, receivedPasswordSerial, receivedUserIndexSerial);
+  processSerialCommunication(serialInput, receivedPasswordSerial, receivedUserIndexSerial);
 
     // Look for new cards
   if (!mfrc522.PICC_IsNewCardPresent()) {
@@ -258,33 +258,50 @@ void close_door() {
   door_servo.write(90);
 }
 
-//Needs comments
+/*
+  Function to split a serial message into a password and user index.
+  The serial message should be in the format "password,userIndex,masterPassword(optional)".
+  The master password is optional and is only used to change the password of a user.
+  If the master password is not provided, the user index will be -1 meaning that the password is meant to be checked.
+  Parameters:
+    - serialMessage: The serial message to split.
+    - password: Reference to the variable to store the password.
+    - userIndex: Reference to the variable to store the user index.
+*/
 void splitSerialMessage(char *serialMessage, unsigned long *password, int *userIndex) {
-  char *token = strtok(serialMessage, ",");
-  *password = strtoul(token, NULL, 10);
+  char *token = strtok(serialMessage, ","); // Split the serial message using comma as the delimiter
+  *password = strtoul(token, NULL, 10); // Convert the password string to an unsigned long integer
   
-  token = strtok(NULL, ",");
+  token = strtok(NULL, ","); // Get the next token (user index)
   if (token == NULL) {
-    *userIndex = -1;
+    *userIndex = -1; // If there is no user index provided, set it to -1
     return;
   }
   
-  *userIndex = atoi(token);
-  token = strtok(NULL, ",");
-  // Checks if the master password is correct, then send the user index
+  *userIndex = atoi(token); // Convert the user index string to an integer
+  token = strtok(NULL, ","); // Get the next token (master password)
   if (token == NULL || strtoul(token, NULL, 10) != masterPassword) {
-    *userIndex = -1;
+    *userIndex = -1; // If there is no master password provided or the master password is incorrect, set the user index to -1
   }
 }
 
-// TODO: name me better because it also processes the serial input
-void readSerial(char *serialInput, unsigned long &receivedPasswordSerial, int &receivedUserIndexSerial) {
-  if (Serial.available()) {
+/*
+  processSerialCommunication - reads writes and processes serial input/output.
+  It checks for available serial data, reads the input until a newline character is encountered,
+  splits the received message into password and user index, and performs access control based on the received data.
+  If a user index is received, it updates the password for that user.
+  Parameters:
+    - serialInput: The character array to store the received serial input.
+    - receivedPasswordSerial: Reference to the variable to store the received password.
+    - receivedUserIndexSerial: Reference to the variable to store the received user index.
+*/
+void processSerialCommunication(char *serialInput, unsigned long &receivedPasswordSerial, int &receivedUserIndexSerial) {
+  if (Serial.available()) { // Check if there is serial data available
         Serial.readBytesUntil('\n', serialInput, MAX_MESSAGE_LENGTH);
         //Serial.println(serialInput);
-        splitSerialMessage(serialInput, &receivedPasswordSerial, &receivedUserIndexSerial);
+        splitSerialMessage(serialInput, &receivedPasswordSerial, &receivedUserIndexSerial); // Split the serial message into password and user index
         bool accessGranted = false;
-        if (receivedUserIndexSerial < 0) {
+        if (receivedUserIndexSerial < 0) { // If we have not received a user index, then splitSerialMessage has received a valid password, therefore we must check the password.
             // Right now local but check api first
               if (connected_wifi()) {
                 // Call api
@@ -299,11 +316,11 @@ void readSerial(char *serialInput, unsigned long &receivedPasswordSerial, int &r
                   } 
                 }
               }
-            if (accessGranted == false){
+            if (accessGranted == false){ // If the password is incorrect, then accessGranted will be false, and we must deny access.
               Serial.println("0,-1");
               no_access_tone();
             }
-        // Masterpassword????
+        // If we have received a user index, then splitSerialMessage has received a valid master password, therefore we must update the password for that user.
         } else if (receivedUserIndexSerial < NUM_USERS && receivedUserIndexSerial >= 0) { // This updates password for user, needs to work with server
             users[receivedUserIndexSerial].pin = receivedPasswordSerial; //update password
         } else {

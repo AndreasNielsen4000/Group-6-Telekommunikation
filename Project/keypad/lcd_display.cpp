@@ -1,8 +1,9 @@
-#include "lcd_display.h"
 /*
-Function for the LCD display. 
+* LCD display class and methods for the keypad
+* with custom characters for the arrows and lock/unlock symbols
+* Written by Alexander Nordentoft (s176361) and Andreas Nielsen (s203833) - January 2024
 */
-
+#include "lcd_display.h"
 
 LiquidCrystal_I2C lcd(0x27, 16, 2); // I2C address 0x27, 16 column and 2 row
 
