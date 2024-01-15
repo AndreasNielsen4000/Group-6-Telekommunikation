@@ -53,7 +53,7 @@ BleSerial SerialBT;
 //Setup function for Arduino
 void setup() {
   Serial.begin(115200);
-  Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2);
+  Serial2.begin(115200, SERIAL_8N1, RXD2, TXD2);
   //************** TEST *******************
   SerialBT.begin("KeypadBT"); //Bluetooth device name
   Serial.println("The device started, now you can pair it with bluetooth!");
@@ -119,6 +119,7 @@ void mainMenuKeyPad(char *message, char *serialMessage) {
       //Serial communication check
       if (Serial2.available()) {
         Serial2.readBytesUntil('\n', serialMessage, MAX_SERIAL_MESSAGE_LENGTH);
+        Serial.println(serialMessage);
         Serial.println("Serial message received in mainMenuKeyPad()");
         return;
       }

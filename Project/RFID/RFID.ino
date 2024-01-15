@@ -3,15 +3,16 @@
 #include <Servo.h>
 #include <ESP_EEPROM.h>
 
-#include <apicaller.h>
+#include "api_caller.h"
 //#include "../Libraries/api_caller/api_caller.h" // TODO: check this works
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 //#include "../Libraries/Hash.h"
-#include <Hash.h>
+#include "Hash.h"
 
+#define MAX_MESSAGE_LENGTH 32
 #define SS_PIN D8
 #define RST_PIN D0
 #define buzzer D1
@@ -31,10 +32,7 @@ const long RFID_interval = 5000;  // Interval of RFID read
 const long WIFI_interval = 1000;  // Interval of WIFI read
 const int keycards = NUM_USERS; // TODO: maybe change this
 const int keycard_length = 11;
-//String UID[keycards];  // Create placeholders for the RFID tags
-
-char UID[NUM_USERS][11] = {'\0'};
-
+unsigned long masterPassword = 0;
 // Struct for stroing a user in memory (the pin and rfid is hashed)
 struct User {
   unsigned long pin;
@@ -43,9 +41,9 @@ struct User {
 
 // The user store
 User users[NUM_USERS] = {
-  { 0, 0 },
-  { 0, 0 },
-  { 0, 0 },
+  { hashPassword("1234"), hashPassword("50 48 B5 1E")},
+  { 0, hashPassword("0A 59 91 17")},
+  { 0, hashPassword("84 93 E4 52")},
   { 0, 0 },
   { 0, 0 }
 };
@@ -54,26 +52,28 @@ User users[NUM_USERS] = {
 void setup() {
   Serial.begin(115200);  // Initiate a serial communication
 
-  WiFi.begin(ssid, pass);
-  // Waiting for WIFI connection
-  Serial.println("WIFI connecting");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.print("\n\nConnected to ");
-  Serial.println(ssid);
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-  
+  //WiFi.begin(ssid, pass);
+  //// Waiting for WIFI connection
+  //Serial.println("WIFI connecting");
+  //while (WiFi.status() != WL_CONNECTED) {
+  //  delay(500);
+  //  Serial.print(".");
+  //}
+  //Serial.print("\n\nConnected to ");
+  //Serial.println(ssid);
+  //Serial.print("IP address: ");
+  //Serial.println(WiFi.localIP());
+  masterPassword = hashPassword("12345678");
   EEPROM.begin(keycards * keycard_length);  // Initiate EEPROM memory size
   SPI.begin();                              // Initiate  SPI bus
   mfrc522.PCD_Init();                       // Initiate MFRC522
-  Serial.println("Approximate your card to the reader...");
-  Serial.println();
+  //Serial.println("Approximate your card to the reader...");
+
+  //Serial.println();
 
   myservo.attach(2, 500, 2400);  // Attaches the servo on pin D4 to the servo object
   pinMode(buzzer, OUTPUT);
+
 
   //UID[0] = "           ";
   //UID[1] = "50 48 B5 1E";
@@ -81,25 +81,37 @@ void setup() {
   //UID[3] = "84 93 E4 52";
   //UID[4] = "           ";
 
-  for (int i = 0; i < keycards; i++) {
-    //manual_put_memory(UID[i], i);
-  }
-
-  // read the UID values from the memory
-  for (int i = 0; i < keycards; i++) {
-    UID[i] = read_memory(i);
-    Serial.println(UID[i]);
-  }
-
   //put_memory("17 48 43 4A");
 }
 
 void loop() {
-  while (WiFi.status() != WL_CONNECTED) {
-    //Serial.println("Not connected to WiFi...");
-    //delay(1000);  // remove delay
+  //while (WiFi.status() != WL_CONNECTED) {
+    char serialInput[MAX_MESSAGE_LENGTH] = {'\0'};
+    unsigned long receivedPasswordSerial = 0;
+    int receivedUserIndexSerial = -1;
 
-    // Look for new cards
+    if (Serial.available()) {
+        Serial.readBytesUntil('\n', serialInput, MAX_MESSAGE_LENGTH);
+        //Serial.println(serialInput);
+        splitSerialMessage(serialInput, &receivedPasswordSerial, &receivedUserIndexSerial);
+        if (receivedUserIndexSerial < 0) {
+            for (int i = 0; i < NUM_USERS; i++) {
+                if (users[i].pin == receivedPasswordSerial) {
+                    Serial.println("1," + String(i));
+                    access_tone();
+                    break;
+                } 
+            }
+            Serial.println("0,-1");
+        } else if (receivedUserIndexSerial < NUM_USERS && receivedUserIndexSerial >= 0) {
+            users[receivedUserIndexSerial].pin = receivedPasswordSerial; //update password
+        } else {
+            //Serial.println("Invalid user index");
+        }
+        //Serial.println(serialInput);
+    }
+
+      // Look for new cards
     if (!mfrc522.PICC_IsNewCardPresent()) {
       return;
     }
@@ -108,6 +120,8 @@ void loop() {
       return;
     }
 
+    //Serial.println(hashPassword(read_RFID().c_str()));
+    
     // Only read the UID if it is over the interval length since it has last been read
     // TODO: this should hash input and compare to hashed values in memory
     // TODO: This should also have pin 
@@ -115,21 +129,24 @@ void loop() {
     if (currentMillis - previous_RFID_Millis > RFID_interval) {
       bool access_granted = false;
 
-      for (int i = 0; i < keycards; i++) {
-        if (UID[i] == read_RFID()) {
-          access_tone();
+      for (int i = 0; i < NUM_USERS; i++) {
+        if (users[i].rfid == hashPassword(read_RFID().c_str())) {
+          Serial.println("1," + String(i));
           access_granted = true;
+          access_tone();
+          break;
         }
-        Serial.println(UID[i]);
+        //Serial.println(UID[i]);
       }
 
       if (access_granted == false) {
+        Serial.println("0,-1");
         no_access_tone();
       }
     }
-  }
+  //} // it is the while (WiFi.status() != WL_CONNECTED);
 
-  currentMillis = millis();
+  /* currentMillis = millis();
 
   if (currentMillis - previous_WIFI_Millis > WIFI_interval) {
     previous_WIFI_Millis = currentMillis;
@@ -166,11 +183,11 @@ void loop() {
       Serial.println("API call was successful, but the response was not valid.");
       return;
     }
-  }
+  } */
 }
 
 // FIXME: use char array instead of String
-char* read_RFID() {
+String read_RFID() {
   previous_RFID_Millis = currentMillis;
 
   String content = "";
@@ -181,20 +198,20 @@ char* read_RFID() {
     content.concat(String(mfrc522.uid.uidByte[i], HEX));
   }
   content.toUpperCase();
-  return content.substring(1).c_str();  // return the UID
+  return content.substring(1);  // return the UID
 }
 
 String read_memory(int x) {
-  String memory = "";
+  char memory[12];
   for (int i = 0; i < keycard_length; i++) {
-    memory = String(memory + char(EEPROM.read(i + keycard_length * x)));
+    memory[i] = char(EEPROM.read(i + keycard_length * x));
   }
   return memory;
 }
 
 void manual_put_memory(String memory, int x) {
   for (int i = 0; i < memory.length(); ++i) {
-    Serial.print(memory[i]);
+    //Serial.print(memory[i]);
     EEPROM.write(i + keycard_length * x, memory[i]);
   }
   EEPROM.commit();
@@ -210,7 +227,7 @@ void put_memory(String memory) {
   for (int i = 0; i < keycards; i++) {
     if (read_memory(i) == "           ") {
       for (int x = 0; x < memory.length(); ++x) {
-        Serial.print(memory[x]);
+        //Serial.print(memory[x]);
         EEPROM.write(x + i * 11, memory[x]);
       }
       EEPROM.commit();
