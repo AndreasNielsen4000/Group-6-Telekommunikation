@@ -130,7 +130,7 @@ void lcd_display::accessGrantedLCD(int userIndex) {
   lcd.clear();                 // clear display
   lcd.setCursor(0, 0);         // move cursor to   (0, 0)
   lcd.print("Welcome User "); // print message at (0, 0)
-  lcd.print(userIndex);
+  lcd.print(userIndex + 1);
   lcd.setCursor(0, 1);         // move cursor to   (0, 1)¨
   for (int i = 0; i < 16; i++) {
     lcd.write(6);
@@ -153,7 +153,7 @@ void lcd_display::printUserNameLCD(int userIndex) {
   lcd.clear();                 // clear display
   lcd.setCursor(0, 0);         // move cursor to   (0, 0)
   lcd.print("User "); // print message at (0, 0)
-  lcd.print(userIndex+1);
+  lcd.print(userIndex + 1);
   lcd.setCursor(0, 1);         // move cursor to   (0, 1)
   lcd.print(" ");
   lcd.write(0);

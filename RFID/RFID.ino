@@ -20,9 +20,11 @@ const char *ssid = "";   /* Your SSID */
 const char *pass = "";   /* Your Password */
 const char *apiUrl = ""; /* Your API URL. Example: "https://api.example.com" */
 
-unsigned long previousMillis = 0;  // Will store last time the RIFD was read
+unsigned long previous_RFID_Millis = 0;  // Will store last time the RFID was read
+unsigned long previous_WIFI_Millis = 0;  // Will store last time the WIFI was updated
 unsigned long currentMillis;
-const long interval = 5000;  // Interval at which to blink (milliseconds)
+const long RFID_interval = 5000;  // Interval of RFID read
+const long WIFI_interval = 1000;  // Interval of WIFI read
 const int keycards = 5;
 const int keycard_length = 11;
 String UID[keycards];  // Create placeholders for the RFID tags
@@ -49,7 +51,6 @@ void setup() {
   Serial.println();
 
   myservo.attach(2, 500, 2400);  // Attaches the servo on pin D4 to the servo object
-  //close_door();
   pinMode(buzzer, OUTPUT);
 
   //UID[0] = "           ";
@@ -87,7 +88,7 @@ void loop() {
 
     // Only read the UID if it is over the interval length since it has last been read
     currentMillis = millis();
-    if (currentMillis - previousMillis > interval) {
+    if (currentMillis - previous_RFID_Millis > RFID_interval) {
       bool access_granted = false;
 
       for (int i = 0; i < keycards; i++) {
@@ -107,45 +108,48 @@ void loop() {
     }
   }
 
-  // Create a WiFiClient object to talk to the server.
-  WiFiClient client;
+  currentMillis = millis();
 
-  // Create an ApiCaller object with the WiFiClient and API URL.
-  ApiCaller apiCaller(client, apiUrl);
+  if (currentMillis - previous_WIFI_Millis > WIFI_interval) {
+    previous_WIFI_Millis = currentMillis;
 
-  // Call the API with a pin
-  String UID = read_RFID();
-  std::unique_ptr<DynamicJsonDocument> doc = apiCaller.get("/rfid", UID);
+    // Create a WiFiClient object to talk to the server.
+    WiFiClient client;
 
-  // Check if the API call was successful.
-  if (doc == nullptr) {
-    Serial.println("Error calling API");
-    delay(1000);
-    return;
-  }
-  if (doc->containsKey("authenticated")) {
-    if (doc->get<bool>("authenticated")) {
-      Serial.println("API call was successful and the pin was correct.");
+    // Create an ApiCaller object with the WiFiClient and API URL.
+    ApiCaller apiCaller(client, apiUrl);
 
-      access_tone();
+    // Call the API with a pin
+    String UID = read_RFID();
+    std::unique_ptr<DynamicJsonDocument> doc = apiCaller.get("/rfid", UID);
 
-      // Get the value of the "message" key.
-      // TODO: check if the key exists before getting the value.
-      String message = doc->get<String>("message");
-      Serial.println(message);
+    // Check if the API call was successful.
+    if (doc == nullptr) {
+      Serial.println("Error calling API");
+      return;
+    } else if (doc->containsKey("authenticated")) {
+      if (doc->get<bool>("authenticated")) {
+        Serial.println("API call was successful and the pin was correct.");
+
+        access_tone();
+
+        // Get the value of the "message" key.
+        // TODO: check if the key exists before getting the value.
+        String message = doc->get<String>("message");
+        Serial.println(message);
+      } else {
+        Serial.println("API call was successful, but the pin was incorrect.");
+        no_access_tone();
+      }
     } else {
-      Serial.println("API call was successful, but the pin was incorrect.");
-      no_access_tone();
+      Serial.println("API call was successful, but the response was not valid.");
+      return;
     }
-  } else {
-    Serial.println("API call was successful, but the response was not valid.");
-    delay(1000);
-    return;
   }
 }
 
 String read_RFID() {
-  previousMillis = currentMillis;
+  previous_RFID_Millis = currentMillis;
 
   String content = "";
   byte letter;
