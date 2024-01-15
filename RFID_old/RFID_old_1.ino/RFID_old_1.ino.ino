@@ -77,7 +77,7 @@ void loop() {
       no_access_tone();
     }
 
-    unsigned long active_UID = hashPassword("1234");
+    unsigned long active_UID = hashPassword(read_RFID().c_str());
     Serial.println(active_UID);
   }
 }
