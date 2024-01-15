@@ -1,45 +1,53 @@
-#include <SPI.h>
-#include <MFRC522.h>
-#include <Servo.h>
-#include <ESP_EEPROM.h>
-
-#include "api_caller.h"
-//#include "../Libraries/api_caller/api_caller.h" // TODO: check this works
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
-#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
-//#include "../Libraries/Hash.h"
-#include "Hash.h"
+#include <ESP8266HTTPClient.h>
+#include <ESP8266WiFi.h>
+#include <ESP_EEPROM.h>
+#include <MFRC522.h>
+#include <SPI.h>
+#include <Servo.h>
+#include <WiFiClientSecure.h>
 
-#define MAX_MESSAGE_LENGTH 32
-#define SS_PIN D8
-#define RST_PIN D0
-#define buzzer D1
-#define NUM_USERS 5
+#include "Hash.h"
+#include "api_caller.h"
+
+// TODO:
+#define SS_PIN D8   //find out what it does
+#define RST_PIN D0  //find out what it does
+#define BUZZER_PIN D1 // Buzzer pin
+
+#define NUM_USERS 5 // Number of users that can be saved in memory at the same time
+#define KEYCARD_LENGTH 11 // Length of the keycard UID in bytes
+
+// TODO: check if this is correct
+#define MAX_MESSAGE_LENGTH 32 // Max length of the message from serial in bytes
+
+#define RFID_INTERVAL 5000  // Interval in milliseconds between RFID read
+#define WIFI_INTERVAL 1000  // Interval in milliseconds between WiFi read
+
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance.
-Servo myservo;
+Servo door_servo;
 
+// Wifi credentials
 const char *ssid = "";   /* Your SSID */
 const char *pass = "";   /* Your Password */
+
 const char *apiUrl = ""; /* Your API URL. Example: "https://api.example.com" */
 
+// Global variables
 unsigned long previous_RFID_Millis = 0;  // Will store last time the RFID was read
 unsigned long previous_WIFI_Millis = 0;  // Will store last time the WIFI was updated
 unsigned long currentMillis;
-const long RFID_interval = 5000;  // Interval of RFID read
-const long WIFI_interval = 1000;  // Interval of WIFI read
-const int keycards = NUM_USERS; // TODO: maybe change this
-const int keycard_length = 11;
-unsigned long masterPassword = 0;
-// Struct for stroing a user in memory (the pin and rfid is hashed)
+unsigned long masterPassword = hashPassword("12345678"); // Master password for the system
+
+// Struct for stroing a user in memory (the pin and rfid are hashed)
 struct User {
   unsigned long pin;
   unsigned long rfid;
 };
 
-// The user store
+// The array where the users are stored in memory (the pin and rfid are hashed)
+// TODO: this should be stored in EEPROM
 User users[NUM_USERS] = {
   { hashPassword("1234"), hashPassword("50 48 B5 1E")},
   { 0, hashPassword("0A 59 91 17")},
@@ -48,111 +56,66 @@ User users[NUM_USERS] = {
   { 0, 0 }
 };
 
-
 void setup() {
   Serial.begin(115200);  // Initiate a serial communication
 
-  //WiFi.begin(ssid, pass);
-  //// Waiting for WIFI connection
-  //Serial.println("WIFI connecting");
-  //while (WiFi.status() != WL_CONNECTED) {
-  //  delay(500);
-  //  Serial.print(".");
-  //}
-  //Serial.print("\n\nConnected to ");
-  //Serial.println(ssid);
-  //Serial.print("IP address: ");
-  //Serial.println(WiFi.localIP());
-  masterPassword = hashPassword("12345678");
-  EEPROM.begin(keycards * keycard_length);  // Initiate EEPROM memory size
-  SPI.begin();                              // Initiate  SPI bus
-  mfrc522.PCD_Init();                       // Initiate MFRC522
-  //Serial.println("Approximate your card to the reader...");
+  EEPROM.begin(NUM_USERS * KEYCARD_LENGTH);  // Initiate EEPROM memory size
+  SPI.begin();                               // Initiate SPI bus
+  mfrc522.PCD_Init();                        // Initiate MFRC522
 
-  //Serial.println();
+  door_servo.attach(D4, 500, 2400);  // Attaches the servo on pin D4 to the servo object
+  pinMode(BUZZER_PIN, OUTPUT);
 
-  myservo.attach(2, 500, 2400);  // Attaches the servo on pin D4 to the servo object
-  pinMode(buzzer, OUTPUT);
-
-
-  //UID[0] = "           ";
-  //UID[1] = "50 48 B5 1E";
-  //UID[2] = "0A 59 91 17";
-  //UID[3] = "84 93 E4 52";
-  //UID[4] = "           ";
-
-  //put_memory("17 48 43 4A");
+  connected_wifi(3); // Try to connect to wifi 3 times
 }
 
 void loop() {
-  //while (WiFi.status() != WL_CONNECTED) {
-    char serialInput[MAX_MESSAGE_LENGTH] = {'\0'};
-    unsigned long receivedPasswordSerial = 0;
-    int receivedUserIndexSerial = -1;
+  // The loop is split up into two parts, one for serial input and one for RFID input
 
-    if (Serial.available()) {
-        Serial.readBytesUntil('\n', serialInput, MAX_MESSAGE_LENGTH);
-        //Serial.println(serialInput);
-        splitSerialMessage(serialInput, &receivedPasswordSerial, &receivedUserIndexSerial);
-        bool accessGranted = false;
-        if (receivedUserIndexSerial < 0) {
-            for (int i = 0; i < NUM_USERS; i++) {
-                if (users[i].pin == receivedPasswordSerial) {
-                    accessGranted = true;
-                    Serial.println("1," + String(i));
-                    access_tone();
-                    break;
-                } 
-            }
-            if (accessGranted == false){
-              Serial.println("0,-10");
-            }
-        } else if (receivedUserIndexSerial < NUM_USERS && receivedUserIndexSerial >= 0) {
-            users[receivedUserIndexSerial].pin = receivedPasswordSerial; //update password
-        } else {
-            //Serial.println("Invalid user index");
-        }
-        //Serial.println(serialInput);
-    }
+  // Read serial input
+  char serialInput[MAX_MESSAGE_LENGTH] = {'\0'};
+  unsigned long receivedPasswordSerial = 0;
+  int receivedUserIndexSerial = -1;
 
-      // Look for new cards
-    if (!mfrc522.PICC_IsNewCardPresent()) {
-      return;
-    }
-    // Select one of the cards
-    if (!mfrc522.PICC_ReadCardSerial()) {
-      return;
-    }
+  readSerial(serialInput, receivedPasswordSerial, receivedUserIndexSerial);
 
-    //Serial.println(hashPassword(read_RFID().c_str()));
-    
-    // Only read the UID if it is over the interval length since it has last been read
-    // TODO: this should hash input and compare to hashed values in memory
-    // TODO: This should also have pin 
-    currentMillis = millis();
-    if (currentMillis - previous_RFID_Millis > RFID_interval) {
-      bool access_granted = false;
+    // Look for new cards
+  if (!mfrc522.PICC_IsNewCardPresent()) {
+    return;
+  }
+  // Select one of the cards
+  if (!mfrc522.PICC_ReadCardSerial()) {
+    return;
+  }
 
-      for (int i = 0; i < NUM_USERS; i++) {
-        if (users[i].rfid == hashPassword(read_RFID().c_str())) {
-          Serial.println("1," + String(i));
-          access_granted = true;
-          access_tone();
-          break;
-        }
-        //Serial.println(UID[i]);
+  //Serial.println(hashPassword(read_RFID().c_str()));
+  
+  // Only read the UID if it is over the interval length since it has last been read
+  // TODO: this should hash input and compare to hashed values in memory
+  // TODO: This should also have pin 
+  currentMillis = millis();
+  if (currentMillis - previous_RFID_Millis > RFID_INTERVAL) {
+    bool access_granted = false;
+
+    for (int i = 0; i < NUM_USERS; i++) {
+      if (users[i].rfid == hashPassword(read_RFID().c_str())) {
+        Serial.println("1," + String(i));
+        access_granted = true;
+        access_tone();
+        break;
       }
-
-      if (access_granted == false) {
-        Serial.println("0,-1");
-        no_access_tone();
-      }
+      //Serial.println(UID[i]);
     }
-  //} // it is the while (WiFi.status() != WL_CONNECTED);
+
+    if (access_granted == false) {
+      Serial.println("0,-1");
+      no_access_tone();
+    }
+  }
 
   /* currentMillis = millis();
 
-  if (currentMillis - previous_WIFI_Millis > WIFI_interval) {
+  if (currentMillis - previous_WIFI_Millis > WIFI_INTERVAL) {
     previous_WIFI_Millis = currentMillis;
 
     // Create a WiFiClient object to talk to the server.
@@ -207,8 +170,8 @@ String read_RFID() {
 
 String read_memory(int x) {
   char memory[12];
-  for (int i = 0; i < keycard_length; i++) {
-    memory[i] = char(EEPROM.read(i + keycard_length * x));
+  for (int i = 0; i < KEYCARD_LENGTH; i++) {
+    memory[i] = char(EEPROM.read(i + KEYCARD_LENGTH * x));
   }
   return memory;
 }
@@ -216,19 +179,19 @@ String read_memory(int x) {
 void manual_put_memory(String memory, int x) {
   for (int i = 0; i < memory.length(); ++i) {
     //Serial.print(memory[i]);
-    EEPROM.write(i + keycard_length * x, memory[i]);
+    EEPROM.write(i + KEYCARD_LENGTH * x, memory[i]);
   }
   EEPROM.commit();
 }
 
 void put_memory(String memory) {
   // Checks if the new UID to be saved is allready saved
-  for (int i = 0; i < keycards; i++) {
+  for (int i = 0; i < NUM_USERS; i++) {
     if (read_memory(i) == memory) {
       return;
     }
   }
-  for (int i = 0; i < keycards; i++) {
+  for (int i = 0; i < NUM_USERS; i++) {
     if (read_memory(i) == "           ") {
       for (int x = 0; x < memory.length(); ++x) {
         //Serial.print(memory[x]);
@@ -241,10 +204,10 @@ void put_memory(String memory) {
 }
 
 void remove_memory(String memory) {
-  for (int i = 0; i < keycards; i++) {
+  for (int i = 0; i < NUM_USERS; i++) {
     if (read_memory(i) == memory) {
       for (int x = 0; x < memory.length(); ++x) {
-        EEPROM.write(x + i * keycard_length, 32);
+        EEPROM.write(x + i * KEYCARD_LENGTH, 32);
       }
       EEPROM.commit();
     }
@@ -252,49 +215,50 @@ void remove_memory(String memory) {
 }
 
 void reset_memory() {
-  for (int i = 0; i < keycards; i++) {
-    for (int x = 0; x < keycard_length; ++x) {
-      EEPROM.write(x + i * keycard_length, 32);
+  for (int i = 0; i < NUM_USERS; i++) {
+    for (int x = 0; x < KEYCARD_LENGTH; ++x) {
+      EEPROM.write(x + i * KEYCARD_LENGTH, 32);
     }
   }
   EEPROM.commit();
 }
 
 void access_tone() {
-  tone(buzzer, 1046.5);
+  tone(BUZZER_PIN, 1046.5);
   delay(200);
-  tone(buzzer, 1174.66);
+  tone(BUZZER_PIN, 1174.66);
   delay(200);
-  tone(buzzer, 1318.51);
+  tone(BUZZER_PIN, 1318.51);
   delay(200);
-  noTone(buzzer);
+  noTone(BUZZER_PIN);
   delay(800);
-  tone(buzzer, 1396.91);
+  tone(BUZZER_PIN, 1396.91);
   open_door();
   delay(300);
-  noTone(buzzer);
+  noTone(BUZZER_PIN);
   delay(9700);
   close_door();
 }
 
 void no_access_tone() {
-  tone(buzzer, 932.33);
+  tone(BUZZER_PIN, 932.33);
   delay(500);
-  tone(buzzer, 880);
+  tone(BUZZER_PIN, 880);
   delay(500);
-  tone(buzzer, 830.61);
+  tone(BUZZER_PIN, 830.61);
   delay(800);
-  noTone(buzzer);
+  noTone(BUZZER_PIN);
 }
 
 void open_door() {
-  myservo.write(0);
+  door_servo.write(0);
 }
 
 void close_door() {
-  myservo.write(90);
+  door_servo.write(90);
 }
 
+//Needs comments
 void splitSerialMessage(char *serialMessage, unsigned long *password, int *userIndex) {
   char *token = strtok(serialMessage, ",");
   *password = strtoul(token, NULL, 10);
@@ -307,7 +271,88 @@ void splitSerialMessage(char *serialMessage, unsigned long *password, int *userI
   
   *userIndex = atoi(token);
   token = strtok(NULL, ",");
+  // Checks if the master password is correct, then send the user index
   if (token == NULL || strtoul(token, NULL, 10) != masterPassword) {
     *userIndex = -1;
+  }
+}
+
+// TODO: name me better because it also processes the serial input
+void readSerial(char *serialInput, unsigned long &receivedPasswordSerial, int &receivedUserIndexSerial) {
+  if (Serial.available()) {
+        Serial.readBytesUntil('\n', serialInput, MAX_MESSAGE_LENGTH);
+        //Serial.println(serialInput);
+        splitSerialMessage(serialInput, &receivedPasswordSerial, &receivedUserIndexSerial);
+        bool accessGranted = false;
+        if (receivedUserIndexSerial < 0) {
+            // Right now local but check api first
+              if (connected_wifi()) {
+                // Call api
+                accessGranted = call_api(receivedPasswordSerial).authenticated;
+              } else {
+                for (int i = 0; i < NUM_USERS; i++) {
+                  if (users[i].pin == receivedPasswordSerial) {
+                      accessGranted = true;
+                      Serial.println("1," + String(i));
+                      access_tone();
+                      break;
+                  } 
+                }
+              }
+            if (accessGranted == false){
+              Serial.println("0,-1");
+              no_access_tone();
+            }
+        // Masterpassword????
+        } else if (receivedUserIndexSerial < NUM_USERS && receivedUserIndexSerial >= 0) { // This updates password for user, needs to work with server
+            users[receivedUserIndexSerial].pin = receivedPasswordSerial; //update password
+        } else {
+            //Serial.println("Invalid user index");
+        }
+        //Serial.println(serialInput);
+    }
+}
+
+/*
+* Connect to wifi with a number of retries
+*
+* @param retry_times: number of times to retry connecting to wifi. Default is 0
+* @return true if connected to wifi, false otherwise
+*/
+bool connected_wifi(char retry_times = 0){
+  WiFi.begin(ssid, pass);
+  // Waiting for WIFI connection
+  char i = 0;
+  while (WiFi.status() != WL_CONNECTED && i < retry_times) {
+    delay(500);
+    i++;
+  }
+
+  return WiFi.status() == WL_CONNECTED;
+}
+
+struct ApiStruct {
+  bool authenticated;
+  String message;
+};
+
+ApiStruct call_api(unsigned long password) {
+// TODO: right now we ignore the index of the pin, but we shoulden't
+  // Create a WiFiClient object to talk to the server.
+  WiFiClient client;
+
+  // Create an ApiCaller object with the WiFiClient and API URL.
+  ApiCaller apiCaller(client, apiUrl);
+
+  // Call the API with a pin
+  String passwordString = String(password);
+  std::unique_ptr<DynamicJsonDocument> doc = apiCaller.GET("/pin", passwordString);
+
+  // Check if the API call was successful.
+  if (doc == nullptr) {
+    return ApiStruct{false, "Error calling API"};
+  } else if (doc->containsKey("authenticated")) {
+    bool auth = (*doc)["authenticated"].as<bool>();
+    return ApiStruct{auth, (*doc)["message"].as<String>()};
   }
 }
