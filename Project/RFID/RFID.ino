@@ -155,6 +155,37 @@ void loop() {
         if (!cmd.password.has_value()) {
           // TODO: error should have the password...
         }
+        //Added to check if the password is correct - needs testing with server on 17th --Alexander
+        //This could be a function with "pin" or "rfid" as a parameter
+        Serial.println("Calling api to check data");
+
+        std::unique_ptr<DynamicJsonDocument> doc = apiCaller.GET("/pin", String(hashPassword(read_RFID().c_str())));
+        if (doc == nullptr) {
+          // TODO: error handling
+          sendSerialResponse(SerialSend::ACCESS_DENIED);
+          return;
+        } 
+
+        if (doc->containsKey("authenticated") ) {
+          bool authenticated = (*doc)["authenticated"].as<bool>();
+          if (authenticated) {
+            int id = (*doc)["id"].as<int>();
+
+            sendSerialResponse(SerialSend::ACCESS_GRANTED, id);
+            access_tone();
+            //Add to EEPROM at the correct index
+            return;
+          } else {
+            sendSerialResponse(SerialSend::ACCESS_DENIED);
+            no_access_tone();
+            //If code is in EEPROM, remove it
+            return;
+          }
+        } else {
+          sendSerialResponse(SerialSend::ACCESS_DENIED);
+          no_access_tone();
+          return;
+        }
         
         // FIXME: plz
         ////ApiStruct api_call = call_api(cmd.password.value());
@@ -173,10 +204,10 @@ void loop() {
         
       } else {
         bool access_granted = false;
+        //This could be a function with "pin" or "rfid" as a parameter
         // Look in EEPROM
         for (int i = 0; i < NUM_USERS; i++) {
           if (users[i].pin == cmd.password.value()) {
-            //Serial.println("1,-1");
             access_granted = true;
             sendSerialResponse(SerialSend::ACCESS_GRANTED, i);
             access_tone();
@@ -186,7 +217,6 @@ void loop() {
 
         if (access_granted == false) {
           sendSerialResponse(SerialSend::ACCESS_DENIED);
-          //Serial.println("0,-1");
           no_access_tone();
         }
       }
