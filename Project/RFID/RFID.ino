@@ -587,19 +587,19 @@ std::optional<CommandStruct> processSerialCommunication() {
     Serial.print("Command: ");
     Serial.println(commandStruct.command);  
     token = strtok(NULL, ","); // Get the next token (password)
-    if (token != NULL && strlen(token) > 0) {
+    if (token != NULL && strlen(token) > 0 && strcmp(token, " ") != 0) {
       commandStruct.password = strtoul(token, NULL, 10); // Convert the password string to an unsigned long integer
       Serial.print("Password: ");
       Serial.println(commandStruct.password.value());
     }
     token = strtok(NULL, ","); // Get the next token (user index)
-    if (token != NULL && strlen(token) > 0) {
+    if (token != NULL && strlen(token) > 0 && strcmp(token, " ") != 0) {
       commandStruct.userIndex = atoi(token); // Convert the user index string to an integer
       Serial.print("User index: ");
       Serial.println(commandStruct.userIndex.value());
     }
     token = strtok(NULL, ","); // Get the next token (master password)
-    if (token != NULL) {
+    if (token != NULL && strcmp(token, " ") != 0) {
       commandStruct.masterPassword = strtoul(token, NULL, 10); // Convert the master password string to an unsigned long integer
       Serial.print("Master password: ");
       Serial.println(commandStruct.masterPassword.value());

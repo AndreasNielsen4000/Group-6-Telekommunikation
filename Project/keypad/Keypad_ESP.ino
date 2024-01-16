@@ -88,8 +88,8 @@ void loop() {
   
   //If messageHash is not equal to the hash of an empty string, send the password to the other ESP through serial
   if (messageHash != hashPassword("\0")) {
-    Serial2.println(String("LOGIN") + "," + String(messageHash) + "," + ",");
-    Serial.println(String("LOGIN") + "," + String(messageHash) + "," + ",");
+    Serial2.println(String("LOGIN") + "," + String(messageHash) + "," + " " + ",");
+    Serial.println(String("LOGIN") + "," + String(messageHash) + "," + " " + ",");
   }
 
   // If serialMessage is not empty, split the serial message from other ESP into message, accessGranted and userIndex, serial prints for debugging
@@ -280,15 +280,15 @@ void adminMenuKeyPad(char *serialMessage) {
             } else if (key == 'D') {
                 lcdDisplay.presentRFIDLCD();
                 //send -100,userIndex,masterPassword to other ESP
-                Serial2.println(String("NEW_RFID") + "," + "," + String(userIndex) + "," + String(masterPassword));
-                Serial.println(String("NEW_RFID") + "," + "," + String(userIndex) + "," + String(masterPassword));
+                Serial2.println(String("NEW_RFID") + ","  + " " + "," + String(userIndex) + "," + String(masterPassword));
+                Serial.println(String("NEW_RFID") + ","  + " " + "," + String(userIndex) + "," + String(masterPassword));
                 //Wait for confirmation of RFID being scanned from other ESP
                 while (!checkSerialCommunication(serialMessage)) { //TODO - HANDLE RFID_READ
                     char key = keypad.getKey();
                     if (key == '*') {
                       menuIndex = 0;
-                      Serial2.println(String("CANCEL_RFID") + "," + "," + String(userIndex) + "," + String(masterPassword));
-                      Serial.println(String("CANCEL_RFID") + "," + "," + String(userIndex) + "," + String(masterPassword));
+                      Serial2.println(String("CANCEL_RFID") + ","  + " " + "," + String(userIndex) + "," + String(masterPassword));
+                      Serial.println(String("CANCEL_RFID") + ","  + " " + "," + String(userIndex) + "," + String(masterPassword));
                       lcdDisplay.enterPasswordLCD("default");
                       return;
                     }
