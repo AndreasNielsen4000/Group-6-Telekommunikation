@@ -16,7 +16,7 @@ Syntax: `<COMMAND>,<hashedPassword>(optional),<userIndex>(optional),<hashedMaste
 #### Examples:
 ##### User Login:
 Keypad Sends:
-`LOGIN,<hashedPassword>,,`
+`LOGIN,<hashedPassword>, , `
 
 ##### New User Password:
 Keypad Sends:
@@ -24,10 +24,10 @@ Keypad Sends:
 
 ##### New User RFID:
 Keypad Sends:
-`NEW_RFID,,<userIndex>,<hashedMasterPassword>`
+`NEW_RFID, ,<userIndex>,<hashedMasterPassword>`
 
 Cancel RFID:
-`CANCEL_RFID,,,`
+`CANCEL_RFID, , , `
 
 
 ### To Keypad
