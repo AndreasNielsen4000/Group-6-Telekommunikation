@@ -283,7 +283,7 @@ void adminMenuKeyPad(char *serialMessage) {
                 Serial2.println(String("NEW_RFID") + ","  + " " + "," + String(userIndex) + "," + String(masterPassword));
                 Serial.println(String("NEW_RFID") + ","  + " " + "," + String(userIndex) + "," + String(masterPassword));
                 //Wait for confirmation of RFID being scanned from other ESP
-                while (!checkSerialCommunication(serialMessage)) { //TODO - HANDLE RFID_READ
+                while (!checkSerialCommunication(serialMessage) || (strcmp(serialMessage, "READ_RFID") != 0 && strcmp(serialMessage, "ACCESS_DENIED") != 0)) { //TODO - HANDLE RFID_READ
                     char key = keypad.getKey();
                     if (key == '*') {
                       menuIndex = 0;
@@ -292,6 +292,13 @@ void adminMenuKeyPad(char *serialMessage) {
                       lcdDisplay.enterPasswordLCD("default");
                       return;
                     }
+
+                    if (strcmp(serialMessage, "LOGIN") == 0 || strcmp(serialMessage, "NEW_PASSWORD") == 0 || strcmp(serialMessage, "NEW_RFID") == 0 || strcmp(serialMessage, "CANCEL_RFID") == 0) {
+                      // Ignore known commands that are not relevant
+                      continue;
+                    }
+                    // Print any other received serial data
+                    Serial.println(serialMessage);
                 }
                 continue;
             } else if (key == '#') {
