@@ -21,6 +21,7 @@ public:
     void accessGrantedLCD(int userIndex);
     void passTooLongLCD();
     void printUserNameLCD(int userIndex);
+    void presentRFIDLCD();
 };
 
 

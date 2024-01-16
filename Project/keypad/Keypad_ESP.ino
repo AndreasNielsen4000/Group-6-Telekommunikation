@@ -13,7 +13,7 @@
 
 // Constants
 #define MAX_MESSAGE_LENGTH 9
-#define MAX_SERIAL_MESSAGE_LENGTH 32
+#define MAX_SERIAL_MESSAGE_LENGTH 150
 #define NUM_USERS 5
 #define RXD2 13 //define RX pin for serial2 communication (between ESPs)
 #define TXD2 15 //define TX pin for serial2 communication (between ESPs)
@@ -49,11 +49,11 @@ char keypadKeys[ROW_NUM][COLUMN_NUM] = {
 Keypad keypad = Keypad( makeKeymap(keypadKeys), rowPins, columnPins, ROW_NUM, COLUMN_NUM );
 
 // Password for admin access
-unsigned long adminPassword = hashPassword("12345678");
+unsigned long masterPassword = hashPassword("12345678");
 
 // Object declarations for LCD display, LED control and Bluetooth serial communication
 lcd_display lcdDisplay;
-led_control ledControl(PIN_RED, PIN_GREEN, PIN_BLUE, PIN_LIGHT, LDRPin, buzzerPin);
+led_control ledControl(RED_LED, GREEN_LED, BLUE_LED, WHITE_LED, LDR_PIN, BUZZER_PIN);
 BleSerial SerialBT;
 
 //Setup function for Arduino
@@ -71,7 +71,6 @@ void setup() {
 void loop() {
   char message[MAX_MESSAGE_LENGTH] = {'\0'}; //message array for keypad input
   char serialMessage[MAX_SERIAL_MESSAGE_LENGTH] = {'\0'}; //message array for serial input
-  bool passFound = false; //bool for checking if password is found
 
   /*  //Serial communication check
   if (Serial2.available()) {
@@ -89,30 +88,44 @@ void loop() {
   
   //If messageHash is not equal to the hash of an empty string, send the password to the other ESP through serial
   if (messageHash != hashPassword("\0")) {
-    Serial2.println(messageHash); //send password to ESP to open door
+    Serial2.println(String("LOGIN") + "," + String(messageHash) + "," + ",");
+    Serial.println(String("LOGIN") + "," + String(messageHash) + "," + ",");
   }
 
   // If serialMessage is not empty, split the serial message from other ESP into message, accessGranted and userIndex, serial prints for debugging
   if (serialMessage[0] != '\0' && serialMessage[0] != '\r') {
-    splitSerialMessage(serialMessage, &passFound, &userIndex);
-    Serial.println("MESSAGE: ");
-    Serial.println(serialMessage);
-    Serial.println("PASSFOUND: ");
-    Serial.println(passFound);
-    Serial.println("USERINDEX: ");
-    Serial.println(userIndex);
-    updateStatus(passFound, userIndex); //Gives feedback to user if password is correct or not through LED and LCD
+    Serial.println("Serial message received from serial: " + String(serialMessage));
+    parseSerialResponse(serialMessage);
   }
 }
 
-//Function for splitting serial message into accessGranted and userIndex
-void splitSerialMessage(char *serialMessage, bool *accessGranted, int *userIndex) {
+/**
+ * Parses the serial response message and updates the status based on the received information.
+ * 
+ * @param serialMessage The serial response message to parse.
+ */
+void parseSerialResponse(char *serialMessage) {
+  int userIndex = -1;
+  bool accessGranted = false;
+  String tempMessage = "";
+  tempMessage = serialMessage;
   char *token = strtok(serialMessage, ",");
-  *accessGranted = atoi(token);
+  if (strcmp(token, "ACCESS") == 0) {
+    accessGranted = true;
+  } else if (strcmp(token, "ACCESS_DENIED") == 0) {
+    accessGranted = false;
+  } else {  // Not a valid message, must be a debug message from the other ESP - print it to the serial monitor and return
+    Serial.println("Received: " + tempMessage);
+    return;
+  }
   token = strtok(NULL, ",");
-  *userIndex = atoi(token);
+  if (token != NULL) {
+    userIndex = atoi(token);
+  } else {
+    userIndex = -1; // Set a default value for userIndex if not provided
+  }
+  updateStatus(accessGranted, userIndex); //Gives feedback to user if password is correct or not through LED and LCD
 }
-
 
 /**
  * mainMenuKeyPad reads the keypad input in the main menu and performs actions based on the input.
@@ -131,7 +144,6 @@ void mainMenuKeyPad(char *message, char *serialMessage) {
     
     //Checking for keypad input, serial input and bluetooth input
     while (!keyReceived) {
-
       //If there is data available to read from the serial port, read it into the serial message buffer and exit the function
       if (checkSerialCommunication(serialMessage)) {
         if (messagePos > 0) {
@@ -141,7 +153,6 @@ void mainMenuKeyPad(char *message, char *serialMessage) {
         return;
       }
 
-      
       // Check if there is data available to read from the Bluetooth serial
       if (SerialBT.available()) {
         // Read the incoming data until a newline character is encountered
@@ -228,7 +239,7 @@ void adminMenuKeyPad(char *serialMessage) {
     unsigned long messageHash = hashPassword(message);
 
     //check if admin access is granted, if not, return to main menu
-    if (messageHash == adminPassword) {
+    if (messageHash == masterPassword) {
         menuIndex = 2;
         lcdDisplay.printUserNameLCD(userIndex); 
     }
@@ -256,21 +267,39 @@ void adminMenuKeyPad(char *serialMessage) {
                 lcdDisplay.enterPasswordLCD("default");
             } else if (key == 'B') {
                 userIndex++;
-                if (userIndex >= 5) {
+                if (userIndex >= NUM_USERS) {
                 userIndex = 0;
                 }
                 lcdDisplay.printUserNameLCD(userIndex);
             } else if (key == 'C') {
                 userIndex--;
                 if (userIndex < 0) {
-                userIndex = 4;
+                userIndex = NUM_USERS-1;
                 }
                 lcdDisplay.printUserNameLCD(userIndex);
+            } else if (key == 'D') {
+                lcdDisplay.presentRFIDLCD();
+                //send -100,userIndex,masterPassword to other ESP
+                Serial2.println(String("NEW_RFID") + "," + "," + String(userIndex) + "," + String(masterPassword));
+                Serial.println(String("NEW_RFID") + "," + "," + String(userIndex) + "," + String(masterPassword));
+                //Wait for confirmation of RFID being scanned from other ESP
+                while (!checkSerialCommunication(serialMessage)) { //TODO - HANDLE RFID_READ
+                    char key = keypad.getKey();
+                    if (key == '*') {
+                      menuIndex = 0;
+                      Serial2.println(String("CANCEL_RFID") + "," + "," + String(userIndex) + "," + String(masterPassword));
+                      Serial.println(String("CANCEL_RFID") + "," + "," + String(userIndex) + "," + String(masterPassword));
+                      lcdDisplay.enterPasswordLCD("default");
+                      return;
+                    }
+                }
+                continue;
             } else if (key == '#') {
                 lcdDisplay.enterPasswordLCD("User");
                 mainMenuKeyPad(message, serialMessage); // Enter new password for user
                 if (message[0] != '\0') {
-                  Serial2.println(String(hashPassword(message)) + "," + String(userIndex) + "," + String(adminPassword)); // send password and user index to other ESP
+                  Serial2.println(String("NEW_PASSWORD") + "," + String(hashPassword(message)) + "," + String(userIndex) + "," + String(masterPassword)); // send password and user index to other ESP
+                  Serial.println(String("NEW_PASSWORD") + "," + String(hashPassword(message)) + "," + String(userIndex) + "," + String(masterPassword)); // send password and user index to other ESP
                 }
                 menuIndex = 0;
             }

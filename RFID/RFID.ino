@@ -69,7 +69,7 @@ void setup() {
     Serial.println(UID[i]);
   }
 
-  //put_memory("17 48 43 4A");
+  //write_user_array_to_eeprom("17 48 43 4A");
 }
 
 void loop() {
@@ -177,7 +177,7 @@ void manual_put_memory(String memory, int x) {
   EEPROM.commit();
 }
 
-void put_memory(String memory) {
+void write_user_array_to_eeprom(String memory) {
   // Checks if the new UID to be saved is allready saved
   for (int i = 0; i < keycards; i++) {
     if (read_memory(i) == memory) {

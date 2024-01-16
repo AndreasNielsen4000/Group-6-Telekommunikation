@@ -74,6 +74,17 @@ byte arrowRight[] = {
   B00000
 };
 
+byte rfidSymbol[] = {
+  B01110,
+  B11111,
+  B11111,
+  B11111,
+  B01100,
+  B01111,
+  B01100,
+  B01111
+};
+
 /*
 * Constructor for the LCD display
 *
@@ -90,6 +101,7 @@ void lcd_display::init() {
   lcd.createChar(1, arrowDown);
   lcd.createChar(2, arrowLeft);
   lcd.createChar(3, arrowRight);
+  lcd.createChar(4, rfidSymbol);
   lcd.createChar(6, unLock);
   lcd.createChar(7, Lock);
 }
@@ -157,20 +169,30 @@ void lcd_display::printUserNameLCD(int userIndex) {
   lcd.print(userIndex + 1);
   lcd.setCursor(0, 1);         // move cursor to   (0, 1)
   lcd.print(" ");
+  lcd.print(" ");
   lcd.write(0);
   lcd.print("B");
-  lcd.print(" ");
   lcd.print(" ");
   lcd.write(1);
   lcd.print("C");
   lcd.print(" ");
-  lcd.print(" ");
   lcd.write(2);
   lcd.print("*");
   lcd.print(" ");
-  lcd.print(" ");
   lcd.write(3);
   lcd.print("#");
+  lcd.print(" ");
+  lcd.write(4);
+  lcd.print("D");
+  lcd.blink_off();
+}
+
+void lcd_display::presentRFIDLCD() {
+  lcd.clear();                 // clear display
+  lcd.setCursor(0, 0);         // move cursor to   (0, 0)
+  lcd.print("Present RFID"); // print message at (0, 0)
+  lcd.setCursor(0, 1);         // move cursor to   (0, 1)
+  lcd.print("card");
   lcd.blink_off();
 }
 
