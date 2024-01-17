@@ -22,6 +22,7 @@
 // TODO: check if this is correct
 #define MAX_MESSAGE_LENGTH 50 // Max length of the message from serial in bytes
 
+#define OPEN_DOOR_TIME 2000  // The time the door is open in milliseconds
 #define RFID_INTERVAL 5000  // Interval in milliseconds between RFID read
 #define WIFI_INTERVAL 1000  // Interval in milliseconds between WiFi read
 #define NEW_RFID_TIMEOUT 10000 // Time to read a new RFID before a timeout in milliseconds
@@ -30,10 +31,10 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance.
 Servo door_servo;
 
 // Wifi credentials
-const char *ssid = "Pixel_6553";   /* Your SSID */
-const char *pass = "yzdrzatxcsywnih";   /* Your Password */
+const char *ssid = "";   /* Your SSID */
+const char *pass = "";   /* Your Password */
 
-const char *apiUrl = "http://192.168.143.130:8080"; /* Your API URL. Example: "https://api.example.com" */
+const char *apiUrl = "http://172.20.10.5:8080"; /* Your API URL. Example: "https://api.example.com" */
 
 // Global variables
 unsigned long previous_RFID_Millis = 0;  // Will store last time the RFID was read
@@ -71,6 +72,7 @@ enum SerialSend {
   ACCESS_GRANTED, // userIndex
   ACCESS_DENIED, // userIndex
   RFID_READ, // rfid
+  PIN_READ, // pin
 };
 
 struct CommandStruct {
@@ -85,12 +87,10 @@ struct ApiStruct {
   int id;
 };
 
-
 // TODO: do something with this
 bool connected_to_wifi(char retry_times);
 std::optional<CommandStruct> processSerialCommunication();
 void sendSerialResponse(SerialSend serialSend, int userIndex = -1);
-
 
 // TODO: rename me to something better
 //ApiStruct call_api(unsigned long password) {
@@ -121,7 +121,6 @@ void sendSerialResponse(SerialSend serialSend, int userIndex = -1);
 //  return ApiStruct{false, "API call was successful, but the response was not valid."};
 //}
 
-
 void setup() {
   Serial.begin(115200);  // Initiate a serial communication
 
@@ -132,9 +131,10 @@ void setup() {
   door_servo.attach(D4, 500, 2400);  // Attaches the servo on pin D4 to the servo object
   pinMode(BUZZER_PIN, OUTPUT);
 
+  initialize_user_array_from_eeprom();  // Write a comment
+
   connected_to_wifi(3); // Try to connect to wifi 3 times
 }
-
 
 void loop() {
   // The loop is split up into two parts, one for serial input and one for RFID input
@@ -159,7 +159,7 @@ void loop() {
         //This could be a function with "pin" or "rfid" as a parameter
         Serial.println("Calling api to check data");
 
-        std::unique_ptr<DynamicJsonDocument> doc = apiCaller.GET("/pin", String(hashPassword(read_RFID().c_str())));
+        std::unique_ptr<DynamicJsonDocument> doc = apiCaller.GET("/pin", String(cmd.password.value()));
         if (doc == nullptr) {
           // TODO: error handling
           sendSerialResponse(SerialSend::ACCESS_DENIED);
@@ -201,7 +201,6 @@ void loop() {
         //  no_access_tone();
         //}
 
-        
       } else {
         bool access_granted = false;
         //This could be a function with "pin" or "rfid" as a parameter
@@ -221,7 +220,6 @@ void loop() {
         }
       }
 
-
       break; // LOGIN
     }
     case SerialCommand::NEW_RFID: {
@@ -236,7 +234,9 @@ void loop() {
       Serial.println("Made it here");
 
       if (!cmd.masterPassword.has_value()) {
-        Serial.println("We are fucked");
+        // TODO: error handling
+        Serial.println("No master password");
+        return;
       }
 
       // Check if the master password is correct
@@ -260,17 +260,18 @@ void loop() {
           currentMillis = millis();
           continue;
         }
+        Serial.println("Has read data");
 
         new_hashed_rfid = hashPassword(read_RFID().c_str());
         has_read_rfid = true;
-      } while (!has_read_rfid || currentMillis - new_rfid_millis < NEW_RFID_TIMEOUT);
+      } while (!has_read_rfid && currentMillis - new_rfid_millis < NEW_RFID_TIMEOUT);
 
       if (!has_read_rfid) {
         sendSerialResponse(SerialSend::ACCESS_DENIED);
         break;
       }
 
-      std::unique_ptr<DynamicJsonDocument> doc = apiCaller.PUT("/rfid", String(new_hashed_rfid), String(cmd.userIndex.value()));
+      std::unique_ptr<DynamicJsonDocument> doc = apiCaller.PUT("/rfid", String(cmd.userIndex.value()), String(new_hashed_rfid));
       if (doc == nullptr) {
         // TODO: error handling
         sendSerialResponse(SerialSend::ACCESS_DENIED);
@@ -281,25 +282,80 @@ void loop() {
         bool succeeded = (*doc)["success"].as<bool>();
         if (succeeded) {
 
+          Serial.println("Updated RFID");
           // Update the rfid in memory
           compare_and_update_rfid(cmd.userIndex.value(), new_hashed_rfid);
 
           sendSerialResponse(SerialSend::RFID_READ, cmd.userIndex.value());
           access_tone();
         } else {
+          Serial.println("Failed to update RFID");
           sendSerialResponse(SerialSend::ACCESS_DENIED);
           no_access_tone();
         }
+      } else {
+        Serial.println("Failed to update RFID");
+        sendSerialResponse(SerialSend::ACCESS_DENIED);
+        no_access_tone();
       }
 
-    break; // NEW_RFID
+      break; // NEW_RFID
+    }
+    case SerialCommand::NEW_PASSWORD: {
+      // You need to be connected to wifi to change the password
+      if (!connected_to_wifi(0)) {
+          sendSerialResponse(SerialSend::ACCESS_DENIED);
+          return;
+      }
+
+      if (!cmd.masterPassword.has_value() && !cmd.password.has_value()) {
+        // TODO: error handling
+        Serial.println("No master password or password");
+        return;
+      }
+
+      // Check if the master password is correct
+      if (cmd.masterPassword.value() != masterPassword) {
+        sendSerialResponse(SerialSend::ACCESS_DENIED);
+        break;
+      }
+
+
+      std::unique_ptr<DynamicJsonDocument> doc = apiCaller.PUT("/pin", String(cmd.userIndex.value()), String(cmd.password.value()));
+      if (doc == nullptr) {
+        // TODO: error handling
+        sendSerialResponse(SerialSend::ACCESS_DENIED);
+        break;
+      } 
+
+      if (doc->containsKey("success")) {
+        bool succeeded = (*doc)["success"].as<bool>();
+        if (succeeded) {
+
+          Serial.println("Updated PIN");
+          // Update the pin in memory
+          compare_and_update_pin(cmd.userIndex.value(), cmd.password.value());
+
+          sendSerialResponse(SerialSend::PIN_READ, cmd.userIndex.value());
+          access_tone();
+        } else {
+          Serial.println("Failed to update PIN");
+          sendSerialResponse(SerialSend::ACCESS_DENIED);
+          no_access_tone();
+        }
+      } else {
+        Serial.println("Failed to update PIN");
+        sendSerialResponse(SerialSend::ACCESS_DENIED);
+        no_access_tone();
+      }
+
+
     }
     default:
       // Should never reach here
       // TODO: error handling
       break;
     }
-
   }
 
     // Look for new cards
@@ -419,6 +475,12 @@ void loop() {
   } */
 }
 
+/*
+* Reads the UID of the RFID by collecting each byte together in on String
+* Uses the MFRC522.h to read the bytes from the RFID
+*
+* @return the read RFID UID as a String
+*/
 String read_RFID() {
   previous_RFID_Millis = currentMillis;
 
@@ -433,9 +495,16 @@ String read_RFID() {
   return content.substring(1);  // return the UID
 }
 
-unsigned long read_memory(int user_index, bool rfid) {
+/*
+* Read the pin or UID from a specific user 
+*
+* @param user_index: the index of the user in the users array
+* @param read_rfid: true if is a RFID UID that needs to be read
+* @return the hashed pin or UID as an unsigned long
+*/
+unsigned long read_memory(int user_index, bool read_rfid) {
   int rfid_index = 0;
-  if (rfid) {
+  if (read_rfid) {
     rfid_index = 1;
   }
 
@@ -452,6 +521,9 @@ unsigned long read_memory(int user_index, bool rfid) {
   return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
 }
 
+/*
+* Save all of the pins and UIDs from the EEPROM to the user array
+*/
 void initialize_user_array_from_eeprom() {
   // Read the users array from EEPROM
   for (int i = 0; i < NUM_USERS; i++) {
@@ -463,6 +535,9 @@ void initialize_user_array_from_eeprom() {
   }
 }
 
+/*
+* Save the user array that is filled with all of the pins and UIDs to the EEPROM
+*/
 void write_user_array_to_eeprom() {
   for (int i = 0; i < NUM_USERS; i++) {
     // Calculate the EEPROM address for the current user
@@ -473,6 +548,9 @@ void write_user_array_to_eeprom() {
   }
 }
 
+/*
+* Replace all of the memory of the EEPROM by a zero, thereby reseting the memory
+*/
 void reset_memory() {
   for (int i = 0 ; i < EEPROM.length() ; i++) {
     EEPROM.write(i, 0);
@@ -518,6 +596,9 @@ void compare_and_update_rfid(int user_index, unsigned long new_hashed_rfid) {
   }
 }
 
+/*
+* Plays a melody when the access is granted, and then the door opens and closes after a specified time
+*/
 void access_tone() {
   tone(BUZZER_PIN, 1046.5);
   delay(200);
@@ -531,10 +612,13 @@ void access_tone() {
   open_door();
   delay(300);
   noTone(BUZZER_PIN);
-  delay(1700);
+  delay(OPEN_DOOR_TIME - 300);
   close_door();
 }
 
+/*
+* Plays a melody when the access was denied
+*/
 void no_access_tone() {
   tone(BUZZER_PIN, 932.33);
   delay(500);
@@ -552,9 +636,6 @@ void open_door() {
 void close_door() {
   door_servo.write(90);
 }
-
-
-
 
 /*
 * Connect to wifi with a number of retries
@@ -641,7 +722,6 @@ std::optional<CommandStruct> processSerialCommunication() {
   return std::nullopt;
 }
 
-
 /**
  * Sends a serial response based on the given SerialSend value and user index.
  * 
@@ -707,17 +787,4 @@ void sendSerialResponse(SerialSend serialSend, int userIndex) {
 //        //Serial.println(serialInput);
 //    }
 //}
-
-
-/* Read from EEPROM
-  // Read the users array from EEPROM
-  for (int i = 0; i < NUM_USERS; i++) {
-    // Calculate the EEPROM address for the current user
-    int address = i * sizeof(User);
-
-    // Read the user data from EEPROM
-    EEPROM.get(address, users[i]);
-  }
-*/
-
 

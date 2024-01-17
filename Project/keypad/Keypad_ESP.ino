@@ -279,11 +279,10 @@ void adminMenuKeyPad(char *serialMessage) {
                 lcdDisplay.printUserNameLCD(userIndex);
             } else if (key == 'D') {
                 lcdDisplay.presentRFIDLCD();
-                //send -100,userIndex,masterPassword to other ESP
                 Serial2.println(String("NEW_RFID") + ","  + " " + "," + String(userIndex) + "," + String(masterPassword));
                 Serial.println(String("NEW_RFID") + ","  + " " + "," + String(userIndex) + "," + String(masterPassword));
                 //Wait for confirmation of RFID being scanned from other ESP
-                while (!checkSerialCommunication(serialMessage) || (strcmp(serialMessage, "READ_RFID") != 0 && strcmp(serialMessage, "ACCESS_DENIED") != 0)) { //TODO - HANDLE RFID_READ
+                while (!checkSerialCommunication(serialMessage) || (strstr(serialMessage, "READ_RFID") != NULL || strstr(serialMessage, "ACCESS_DENIED") != NULL)) {
                     char key = keypad.getKey();
                     if (key == '*') {
                       menuIndex = 0;
