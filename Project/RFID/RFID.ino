@@ -177,6 +177,12 @@ void loop() {
             return;
           } else {
             sendSerialResponse(SerialSend::ACCESS_DENIED);
+            for (int i = 0; i < NUM_USERS; i++) {
+            if (users[i].pin == cmd.password.value()) {
+              Serial.println("Found password in EEPROM but not in server, deleting from EEPROM");
+              compare_and_update_pin(i, 0);
+            }
+          }
             no_access_tone();
             //If code is in EEPROM, remove it
             return;
@@ -231,8 +237,6 @@ void loop() {
           return;
       }
 
-      Serial.println("Made it here");
-
       if (!cmd.masterPassword.has_value()) {
         // TODO: error handling
         Serial.println("No master password");
@@ -243,17 +247,13 @@ void loop() {
       if (cmd.masterPassword.value() != masterPassword) {
         sendSerialResponse(SerialSend::ACCESS_DENIED);
         break;
-      }
-
-      Serial.println("Made it here 2");
+      };
 
       // Get the new rfid code
       bool has_read_rfid = false;
       long new_rfid_millis = millis();
 
-      unsigned long new_hashed_rfid;
-
-      Serial.println("Made it here 3");
+      unsigned long new_hashed_rfid = 0;
 
       do {
         if (!mfrc522.PICC_IsNewCardPresent() && !mfrc522.PICC_ReadCardSerial()) {
@@ -263,6 +263,7 @@ void loop() {
         Serial.println("Has read data");
 
         new_hashed_rfid = hashPassword(read_RFID().c_str());
+        Serial.println(new_hashed_rfid);
         has_read_rfid = true;
       } while (!has_read_rfid && currentMillis - new_rfid_millis < NEW_RFID_TIMEOUT);
 
@@ -395,6 +396,13 @@ void loop() {
           return;
         } else {
           sendSerialResponse(SerialSend::ACCESS_DENIED);
+          for (int i = 0; i < NUM_USERS; i++) {
+            if (users[i].rfid == hashPassword(read_RFID().c_str())) {
+              Serial.println("Found RFID in EEPROM but not in server, deleting from EEPROM");
+              compare_and_update_rfid(i, 0);
+            }
+          }
+          
           no_access_tone();
           return;
         }
@@ -546,6 +554,7 @@ void write_user_array_to_eeprom() {
     // Write the hashed PIN and RFID values to EEPROM
     EEPROM.put(address, users[i]);
   }
+  EEPROM.commit();
 }
 
 /*
@@ -569,12 +578,13 @@ void reset_memory() {
 */
 void compare_and_update_pin(int user_index, unsigned long new_hashed_pin) {
   if (users[user_index].pin != new_hashed_pin) {
-    // Update the pin in memory
+    // Update the pin in user array
     users[user_index].pin = new_hashed_pin;
 
     // Update the pin in EEPROM
     int address = (user_index * 2) * sizeof(long);
     EEPROM.put(address, new_hashed_pin);
+    EEPROM.commit();
   }
 }  
 
@@ -587,12 +597,13 @@ void compare_and_update_pin(int user_index, unsigned long new_hashed_pin) {
 */
 void compare_and_update_rfid(int user_index, unsigned long new_hashed_rfid) {
   if (users[user_index].rfid != new_hashed_rfid) {
-    // Update the rfid in memory
+    // Update the rfid in user array
     users[user_index].rfid = new_hashed_rfid;
 
     // Update the rfid in EEPROM
     int address = (user_index * 2 + 1) * sizeof(long);
     EEPROM.put(address, new_hashed_rfid);
+    EEPROM.commit();
   }
 }
 
@@ -644,6 +655,11 @@ void close_door() {
 * @return true if connected to wifi, false otherwise
 */
 bool connected_to_wifi(char retry_times = 0){
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("Already connected to wifi");
+    return true;
+  }
+  Serial.println("Connecting to wifi");
   WiFi.begin(ssid, pass);
   // Waiting for WIFI connection
   char i = 0;

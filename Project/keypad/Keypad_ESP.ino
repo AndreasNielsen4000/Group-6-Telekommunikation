@@ -283,22 +283,38 @@ void adminMenuKeyPad(char *serialMessage) {
                 Serial2.println(String("NEW_RFID") + ","  + " " + "," + String(userIndex) + "," + String(masterPassword));
                 Serial.println(String("NEW_RFID") + ","  + " " + "," + String(userIndex) + "," + String(masterPassword));
                 //Wait for confirmation of RFID being scanned from other ESP
-                while (!checkSerialCommunication(serialMessage) || (strstr(serialMessage, "READ_RFID") != NULL || strstr(serialMessage, "ACCESS_DENIED") != NULL)) {
-                    char key = keypad.getKey();
-                    if (key == '*') {
+                checkSerialCommunication(serialMessage);
+                bool exitMenu = false;
+                while (!exitMenu) {
+                  char key = keypad.getKey();
+                  if (key == '*') {
+                    menuIndex = 0;
+                    Serial2.println(String("CANCEL_RFID") + ","  + " " + "," + String(userIndex) + "," + String(masterPassword));
+                    Serial.println(String("CANCEL_RFID") + ","  + " " + "," + String(userIndex) + "," + String(masterPassword));
+                    lcdDisplay.enterPasswordLCD("default");
+                    return;
+                  }
+                  
+                  if (checkSerialCommunication(serialMessage)) {
+
+                    Serial.println(String(serialMessage));
+                  
+
+                    if (strstr(serialMessage, "RFID_READ") != NULL || strstr(serialMessage, "ACCESS_DENIED") != NULL) {
+                      Serial.println("RFID scanned");
                       menuIndex = 0;
-                      Serial2.println(String("CANCEL_RFID") + ","  + " " + "," + String(userIndex) + "," + String(masterPassword));
-                      Serial.println(String("CANCEL_RFID") + ","  + " " + "," + String(userIndex) + "," + String(masterPassword));
                       lcdDisplay.enterPasswordLCD("default");
+                      exitMenu = true;
                       return;
                     }
+                    // reset serialMessage
+                    serialMessage[0] = '\0';
+                  }
 
-                    if (strcmp(serialMessage, "LOGIN") == 0 || strcmp(serialMessage, "NEW_PASSWORD") == 0 || strcmp(serialMessage, "NEW_RFID") == 0 || strcmp(serialMessage, "CANCEL_RFID") == 0) {
-                      // Ignore known commands that are not relevant
-                      continue;
-                    }
-                    // Print any other received serial data
-                    Serial.println(serialMessage);
+                }
+                //If there is a message in serialMessage, print it to the serial monitor
+                if (serialMessage[0] != '\0') {
+                  Serial.println(String(serialMessage));
                 }
                 continue;
             } else if (key == '#') {
