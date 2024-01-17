@@ -3,6 +3,7 @@
   It includes functionality for keypad input, LCD display, LED control, and serial communication between ESPs.
   It is meant to be used with an ESP32 and communicates with another ESP through serial communication.
   Created by Alexander Nordentoft (s176361) and Andreas Nielsen (s203833), January 2024.
+  Estimated workshare: Alexander Nordentoft (s176361) 60% and Andreas Nielsen (s203833) 40%.
 */
 
 #include <Keypad.h>
@@ -49,7 +50,7 @@ char keypadKeys[ROW_NUM][COLUMN_NUM] = {
 Keypad keypad = Keypad( makeKeymap(keypadKeys), rowPins, columnPins, ROW_NUM, COLUMN_NUM );
 
 // Password for admin access
-unsigned long masterPassword = hashPassword("12345678");
+unsigned long adminPassword = hashPassword("12345678");
 
 // Object declarations for LCD display, LED control and Bluetooth serial communication
 lcd_display lcdDisplay;
@@ -226,7 +227,7 @@ void adminMenuKeyPad(char *serialMessage) {
   unsigned long messageHash = hashPassword(message);
 
   // Check if admin access is granted, if not, return to main menu
-  if (messageHash == masterPassword) {
+  if (messageHash == adminPassword) {
     menuIndex = 2;
     lcdDisplay.adminMenuLCD(userIndex);
   } else if (menuIndex != 2) {
@@ -269,8 +270,8 @@ void adminMenuKeyPad(char *serialMessage) {
         lcdDisplay.adminMenuLCD(userIndex);
       } else if (key == 'D') {
         lcdDisplay.presentRFIDLCD();
-        Serial2.println(String("NEW_RFID") + "," + " " + "," + String(userIndex) + "," + String(masterPassword));
-        Serial.println(String("NEW_RFID") + "," + " " + "," + String(userIndex) + "," + String(masterPassword));
+        Serial2.println(String("NEW_RFID") + "," + " " + "," + String(userIndex) + "," + String(adminPassword));
+        Serial.println(String("NEW_RFID") + "," + " " + "," + String(userIndex) + "," + String(adminPassword));
 
         // Wait for confirmation of RFID being scanned from other ESP
         checkSerialCommunication(serialMessage);
@@ -280,8 +281,8 @@ void adminMenuKeyPad(char *serialMessage) {
           char key = keypad.getKey();
           if (key == '*') {
             menuIndex = 0;
-            Serial2.println(String("CANCEL_RFID") + "," + " " + "," + String(userIndex) + "," + String(masterPassword));
-            Serial.println(String("CANCEL_RFID") + "," + " " + "," + String(userIndex) + "," + String(masterPassword));
+            Serial2.println(String("CANCEL_RFID") + "," + " " + "," + String(userIndex) + "," + String(adminPassword));
+            Serial.println(String("CANCEL_RFID") + "," + " " + "," + String(userIndex) + "," + String(adminPassword));
             lcdDisplay.enterPasswordLCD("default");
             return;
           }
@@ -307,8 +308,8 @@ void adminMenuKeyPad(char *serialMessage) {
         lcdDisplay.enterPasswordLCD("User");
         mainMenuKeyPad(message, serialMessage); // Enter new password for user
         if (message[0] != '\0') {
-          Serial2.println(String("NEW_PASSWORD") + "," + String(hashPassword(message)) + "," + String(userIndex) + "," + String(masterPassword)); // Send password and user index to other ESP
-          Serial.println(String("NEW_PASSWORD") + "," + String(hashPassword(message)) + "," + String(userIndex) + "," + String(masterPassword)); // Send password and user index to other ESP
+          Serial2.println(String("NEW_PASSWORD") + "," + String(hashPassword(message)) + "," + String(userIndex) + "," + String(adminPassword)); // Send password and user index to other ESP
+          Serial.println(String("NEW_PASSWORD") + "," + String(hashPassword(message)) + "," + String(userIndex) + "," + String(adminPassword)); // Send password and user index to other ESP
         }
         menuIndex = 0;
       }

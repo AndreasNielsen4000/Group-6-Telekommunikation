@@ -1,3 +1,21 @@
+/*
+  RFID.ino - This file contains the code for an ESP-based RFID system.
+  It includes functionality for RFID input, EEPROM, serial communication between ESPs, WiFi setup and use of api_caller.
+  It is meant to be used with an ESP8266 and communicates with another ESP through serial communication.
+  Main responsibles for this file are:
+  - Lukas Schou (s)
+  - Christian Cederhorn (s)
+
+  In addition integration with api_caller and WiFi setup completed with support from:
+  - Mads Harder (s)
+  - Maria Hagedorn (s)
+
+  Integration with serial communication for the ESPs completed with support from:
+  - Alexander Nordentoft (s176361)
+  - Andreas Nielsen (s203833)
+*/
+
+
 #include <ArduinoJson.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
@@ -35,7 +53,7 @@ const char *apiUrl = "http://172.20.10.5:8080"; /* Your API URL. Example: "https
 unsigned long previous_RFID_Millis = 0;  // Will store last time the RFID was read
 unsigned long previous_WIFI_Millis = 0;  // Will store last time the WIFI was updated
 unsigned long currentMillis;
-unsigned long masterPassword = hashPassword("12345678"); // Master password for the system
+unsigned long adminPassword = hashPassword("12345678"); // adminpassword for the system
 
 WiFiClient client;
 ApiCaller apiCaller = ApiCaller(client, apiUrl);
@@ -70,7 +88,7 @@ struct CommandStruct {
   SerialCommand command;
   std::optional<unsigned long> password;
   std::optional<int> userIndex;
-  std::optional<unsigned long> masterPassword;
+  std::optional<unsigned long> adminPassword;
 };
 
 struct ApiStruct {
@@ -180,13 +198,13 @@ void loop() {
           return;
       }
 
-      if (!cmd.masterPassword.has_value()) {
-        Serial.println("No master password");
+      if (!cmd.adminPassword.has_value()) {
+        Serial.println("No admin password");
         return;
       }
 
-      // Check if the master password is correct
-      if (cmd.masterPassword.value() != masterPassword) {
+      // Check if the admin password is correct
+      if (cmd.adminPassword.value() != adminPassword) {
         sendSerialResponse(SerialSend::ACCESS_DENIED);
         break;
       };
@@ -250,13 +268,13 @@ void loop() {
           return;
       }
 
-      if (!cmd.masterPassword.has_value() && !cmd.password.has_value()) {
-        Serial.println("No master password or password");
+      if (!cmd.adminPassword.has_value() && !cmd.password.has_value()) {
+        Serial.println("No admin password or password");
         return;
       }
 
-      // Check if the master password is correct
-      if (cmd.masterPassword.value() != masterPassword) {
+      // Check if the admin password is correct
+      if (cmd.adminPassword.value() != adminPassword) {
         sendSerialResponse(SerialSend::ACCESS_DENIED);
         break;
       }
@@ -573,7 +591,7 @@ std::optional<CommandStruct> processSerialCommunication() {
   // Read serial input
   char serialInput[MAX_MESSAGE_LENGTH] = {'\0'};
   CommandStruct commandStruct;
-  commandStruct.masterPassword = std::nullopt;
+  commandStruct.adminPassword = std::nullopt;
   commandStruct.password = std::nullopt;
   commandStruct.userIndex = std::nullopt;
 
@@ -606,11 +624,11 @@ std::optional<CommandStruct> processSerialCommunication() {
       Serial.print("User index: ");
       Serial.println(commandStruct.userIndex.value());
     }
-    token = strtok(NULL, ","); // Get the next token (master password)
+    token = strtok(NULL, ","); // Get the next token (admin password)
     if (token != NULL && strcmp(token, " ") != 0) {
-      commandStruct.masterPassword = strtoul(token, NULL, 10); // Convert the master password string to an unsigned long integer
-      Serial.print("Master password: ");
-      Serial.println(commandStruct.masterPassword.value());
+      commandStruct.adminPassword = strtoul(token, NULL, 10); // Convert the admin password string to an unsigned long integer
+      Serial.print("Admin password: ");
+      Serial.println(commandStruct.adminPassword.value());
     }
     return commandStruct;
   }

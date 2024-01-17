@@ -1,3 +1,8 @@
+/* Server for door access control system
+ * Main responsible:
+ - Mads/Maria
+*/
+
 const express = require("express");
 const app = express();
 const port = 8080;
