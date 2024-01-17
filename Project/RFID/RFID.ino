@@ -92,35 +92,6 @@ bool connected_to_wifi(char retry_times);
 std::optional<CommandStruct> processSerialCommunication();
 void sendSerialResponse(SerialSend serialSend, int userIndex = -1);
 
-// TODO: rename me to something better
-//ApiStruct call_api(unsigned long password) {
-//// TODO: right now we ignore the index of the pin, but we shoulden't
-//  // Create a WiFiClient object to talk to the server.
-//  WiFiClient client;
-//
-//  // Create an ApiCaller object with the WiFiClient and API URL.
-//  ApiCaller apiCaller(client, apiUrl);
-//
-//  // Call the API with a pin
-//  String passwordString = String(password);
-//  std::unique_ptr<DynamicJsonDocument> doc = apiCaller.GET("/rfid", passwordString);
-//
-//  // Check if the API call was successful.
-//  if (doc == nullptr) {
-//    return ApiStruct{false, 0};
-//  } 
-//  
-//  // Format the response
-//  if (doc->containsKey("authenticated") && doc->containsKey("id")) {
-//    bool auth = (*doc)["authenticated"].as<bool>();
-//    int id = (*doc)["id"].as<int>();
-//
-//    return ApiStruct{auth, id};
-//  }
-//
-//  return ApiStruct{false, "API call was successful, but the response was not valid."};
-//}
-
 void setup() {
   Serial.begin(115200);  // Initiate a serial communication
 
@@ -152,9 +123,6 @@ void loop() {
       // in either api or local if no internet
       // save in EEPROM from API if it has changed?
       if (connected_to_wifi(0)) {
-        if (!cmd.password.has_value()) {
-          // TODO: error should have the password...
-        }
         //Added to check if the password is correct - needs testing with server on 17th --Alexander
         //This could be a function with "pin" or "rfid" as a parameter
         Serial.println("Calling api to check data");
@@ -170,8 +138,12 @@ void loop() {
           bool authenticated = (*doc)["authenticated"].as<bool>();
           if (authenticated) {
             int id = (*doc)["id"].as<int>();
-
             sendSerialResponse(SerialSend::ACCESS_GRANTED, id);
+            if (users[id].pin != cmd.password.value()) {
+              Serial.println("Found password in server but not in EEPROM, adding password to EEPROM");
+              compare_and_update_rfid(id, cmd.password.value());
+            }
+            
             access_tone();
             //Add to EEPROM at the correct index
             return;
@@ -193,20 +165,6 @@ void loop() {
           return;
         }
         
-        // FIXME: plz
-        ////ApiStruct api_call = call_api(cmd.password.value());
-        
-        //if (api_call.authenticated) {
-        //  // TODO: should get index of user (the 1)
-        //  //Serial.println("1,-1");
-        //  sendSerialResponse(SerialSend::ACCESS_GRANTED, api_call.id);
-        //  access_tone();
-        //} else {
-        //  //Serial.println("0,-1");
-        //  sendSerialResponse(SerialSend::ACCESS_DENIED);
-        //  no_access_tone();
-        //}
-
       } else {
         bool access_granted = false;
         //This could be a function with "pin" or "rfid" as a parameter
@@ -378,8 +336,9 @@ void loop() {
     // Call api
     if (connected_to_wifi(0)) {
       Serial.println("Calling api to check data");
+      unsigned long new_hashed_rfid = hashPassword(read_RFID().c_str());
 
-      std::unique_ptr<DynamicJsonDocument> doc = apiCaller.GET("/rfid", String(hashPassword(read_RFID().c_str())));
+      std::unique_ptr<DynamicJsonDocument> doc = apiCaller.GET("/rfid", String(new_hashed_rfid));
       if (doc == nullptr) {
         // TODO: error handling
         sendSerialResponse(SerialSend::ACCESS_DENIED);
@@ -392,12 +351,18 @@ void loop() {
           int id = (*doc)["id"].as<int>();
 
           sendSerialResponse(SerialSend::ACCESS_GRANTED, id);
+          
+          if (users[id].rfid != new_hashed_rfid) {
+            Serial.println("Found RFID in server but not in EEPROM, adding RFID to EEPROM");
+            compare_and_update_rfid(id, new_hashed_rfid);
+          }
+
           access_tone();
           return;
         } else {
           sendSerialResponse(SerialSend::ACCESS_DENIED);
           for (int i = 0; i < NUM_USERS; i++) {
-            if (users[i].rfid == hashPassword(read_RFID().c_str())) {
+            if (users[i].rfid == new_hashed_rfid) {
               Serial.println("Found RFID in EEPROM but not in server, deleting from EEPROM");
               compare_and_update_rfid(i, 0);
             }
@@ -412,17 +377,6 @@ void loop() {
         return;
       }
 
-      //ApiStruct api_call = call_api(hashPassword(read_RFID().c_str()));
-      //if (api_call.authenticated) {
-      //  sendSerialResponse(SerialSend::ACCESS_GRANTED, 1);//TO DO: get index of user from api
-      //  access_granted = true;
-      //  access_tone();
-      //} else {
-      //  sendSerialResponse(SerialSend::ACCESS_DENIED);
-      //  //Serial.println("0,-1");
-      //  no_access_tone();
-      //}
-      //return;
     }
 
     // Look in EEPROM
@@ -443,44 +397,7 @@ void loop() {
     }
   }
 
-  /* currentMillis = millis();
 
-  if (currentMillis - previous_WIFI_Millis > WIFI_INTERVAL) {
-    previous_WIFI_Millis = currentMillis;
-
-    // Create a WiFiClient object to talk to the server.
-    WiFiClient client;
-
-    // Create an ApiCaller object with the WiFiClient and API URL.
-    ApiCaller apiCaller(client, apiUrl);
-
-    // Call the API with a pin
-    String UID = read_RFID();
-    std::unique_ptr<DynamicJsonDocument> doc = apiCaller.get("/rfid", UID);
-
-    // Check if the API call was successful.
-    if (doc == nullptr) {
-      Serial.println("Error calling API");
-      return;
-    } else if (doc->containsKey("authenticated")) {
-      if (doc->get<bool>("authenticated")) {
-        Serial.println("API call was successful and the pin was correct.");
-
-        access_tone();
-
-        // Get the value of the "message" key.
-        // TODO: check if the key exists before getting the value.
-        String message = doc->get<String>("message");
-        Serial.println(message);
-      } else {
-        Serial.println("API call was successful, but the pin was incorrect.");
-        no_access_tone();
-      }
-    } else {
-      Serial.println("API call was successful, but the response was not valid.");
-      return;
-    }
-  } */
 }
 
 /*
@@ -671,17 +588,6 @@ bool connected_to_wifi(char retry_times = 0){
   return WiFi.status() == WL_CONNECTED;
 }
 
-/*
-  Function to split a serial message into a password and user index.
-  The serial message should be in the format "password,userIndex,masterPassword(optional)".
-  The master password is optional and is only used to change the password of a user.
-  If the master password is not provided, the user index will be -1 meaning that the password is meant to be checked.
-  Parameters:
-    - serialMessage: The serial message to split.
-    - password: Reference to the variable to store the password.
-    - userIndex: Reference to the variable to store the user index.
-*/
-
 /**
  * Reads the serial input and processes it to extract command information.
  * 
@@ -759,48 +665,3 @@ void sendSerialResponse(SerialSend serialSend, int userIndex) {
       break; // Should never reach here
   }
 }
-///*
-//  processSerialCommunication - reads, writes and processes serial input/output.
-//  It checks for available serial data, reads the input until a newline character is encountered,
-//  splits the received message into password and user index, and performs access control based on the received data.
-//  If a user index is received, it updates the password for that user.
-//  Parameters:
-//    - serialInput: The character array to store the received serial input.
-//    - receivedPasswordSerial: Reference to the variable to store the received password.
-//    - receivedUserIndexSerial: Reference to the variable to store the received user index.
-//*/
-//void processSerialCommunication(char *serialInput, unsigned long &receivedPasswordSerial, int &receivedUserIndexSerial) {
-//  if (Serial.available()) { // Check if there is serial data available
-//        Serial.readBytesUntil('\n', serialInput, MAX_MESSAGE_LENGTH);
-//        //Serial.println(serialInput);
-//        splitSerialMessage(serialInput, &receivedPasswordSerial, &receivedUserIndexSerial); // Split the serial message into password and user index
-//        bool accessGranted = false;
-//        if (receivedUserIndexSerial < 0) { // If we have not received a user index, then splitSerialMessage has received a valid password, therefore we must check the password.
-//            // Right now local but check api first
-//              if (connected_to_wifi()) {
-//                // Call api
-//                //accessGranted = call_api(receivedPasswordSerial).authenticated;
-//              } else {
-//                for (int i = 0; i < NUM_USERS; i++) {
-//                  if (users[i].pin == receivedPasswordSerial) {
-//                      accessGranted = true;
-//                      Serial.println("1," + String(i));
-//                      access_tone();
-//                      break;
-//                  } 
-//                }
-//              }
-//            if (accessGranted == false){ // If the password is incorrect, then accessGranted will be false, and we must deny access.
-//              Serial.println("0,-1");
-//              no_access_tone();
-//            }
-//        // If we have received a user index, then splitSerialMessage has received a valid master password, therefore we must update the password for that user.
-//        } else if (receivedUserIndexSerial < NUM_USERS && receivedUserIndexSerial >= 0) { // This updates password for user, needs to work with server
-//            users[receivedUserIndexSerial].pin = receivedPasswordSerial; //update password
-//        } else {
-//            //Serial.println("Invalid user index");
-//        }
-//        //Serial.println(serialInput);
-//    }
-//}
-
