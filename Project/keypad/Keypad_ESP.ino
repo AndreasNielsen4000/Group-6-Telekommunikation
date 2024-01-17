@@ -252,6 +252,7 @@ void adminMenuKeyPad(char *serialMessage) {
     while (menuIndex == 2) {
         //If there is data available to read from the serial port, read it into the serial message buffer and exit the function
         if (checkSerialCommunication(serialMessage)) {
+          menuIndex = 0;
           return;
         }
 
