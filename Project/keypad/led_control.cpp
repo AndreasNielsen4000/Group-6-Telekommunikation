@@ -1,8 +1,6 @@
 /*
 * led_control.cpp
 * Class and methods for controlling the LED and light sensor for the keypad
-* Written by Alexander Nordentoft (s176361) and Andreas Nielsen (s203833) - January 2024
-* Estimated workshare: Alexander Nordentoft (s176361) 60% - Andreas Nielsen (s203833) 40%
 */
 
 #include "led_control.h"

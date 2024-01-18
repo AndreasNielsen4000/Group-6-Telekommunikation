@@ -2,8 +2,6 @@
   Keypad_ESP.ino - This file contains the code for an ESP-based keypad system.
   It includes functionality for keypad input, LCD display, LED control, and serial communication between ESPs.
   It is meant to be used with an ESP32 and communicates with another ESP through serial communication.
-  Created by Alexander Nordentoft (s176361) and Andreas Nielsen (s203833), January 2024.
-  Estimated workshare: Alexander Nordentoft (s176361) 60% and Andreas Nielsen (s203833) 40%.
 */
 
 #include <Keypad.h>

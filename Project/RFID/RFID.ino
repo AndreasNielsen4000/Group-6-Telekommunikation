@@ -2,17 +2,6 @@
   RFID.ino - This file contains the code for an ESP-based RFID system.
   It includes functionality for RFID input, EEPROM, serial communication between ESPs, WiFi setup and use of api_caller.
   It is meant to be used with an ESP8266 and communicates with another ESP through serial communication.
-  Main responsibles for this file are:
-  - Lukas Schou (s)
-  - Christian Cederhorn (s)
-
-  In addition integration with api_caller and WiFi setup completed with support from:
-  - Mads Harder (s)
-  - Maria Hagedorn (s)
-
-  Integration with serial communication for the ESPs completed with support from:
-  - Alexander Nordentoft (s176361)
-  - Andreas Nielsen (s203833)
 */
 
 #include <ArduinoJson.h>

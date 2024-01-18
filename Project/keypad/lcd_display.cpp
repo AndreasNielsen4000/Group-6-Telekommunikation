@@ -1,8 +1,6 @@
 /*
 * LCD display class and methods for the keypad
 * with custom characters for the arrows and lock/unlock symbols
-* Written by Alexander Nordentoft (s176361) and Andreas Nielsen (s203833) - January 2024
-* Estimated workshare: Andreas Nielsen (s203833) 60% and Alexander Nordentoft (s176361) 40%.
 */
 #include "lcd_display.h"
 

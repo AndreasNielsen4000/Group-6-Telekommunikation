@@ -1,6 +1,4 @@
 /* Server for door access control system
- * Main responsible:
- - Mads/Maria
 */
 
 const express = require("express");
