@@ -401,31 +401,6 @@ String read_RFID() {
   return content.substring(1);  // return the UID
 }
 
-/**
-* Read the pin or UID from a specific user 
-*
-* @param user_index: the index of the user in the users array
-* @param read_rfid: true if is a RFID UID that needs to be read
-* @return the hashed pin or UID as an unsigned long
-*/
-unsigned long read_memory(int user_index, bool read_rfid) {
-  int rfid_index = 0;
-  if (read_rfid) {
-    rfid_index = 1;
-  }
-
-  // Calculate the EEPROM address for the current user
-  int address = (user_index * 2 + rfid_index) * sizeof(long);
-
-  // Read every byte of the data
-  long four = EEPROM.read(address);
-  long three = EEPROM.read(address + 1);
-  long two = EEPROM.read(address + 2);
-  long one = EEPROM.read(address + 3);
-
-  // Collect each byte of the long together in one variable
-  return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
-}
 
 /*
 * Save all of the pins and UIDs from the EEPROM to the user array
@@ -441,31 +416,6 @@ void initialize_user_array_from_eeprom() {
   }
 }
 
-/*
-* Save the user array that is filled with all of the pins and UIDs to the EEPROM
-*/
-void write_user_array_to_eeprom() {
-  for (int i = 0; i < NUM_USERS; i++) {
-    // Calculate the EEPROM address for the current user
-    int address = i * sizeof(User);
-
-    // Write the hashed PIN and RFID values to EEPROM
-    EEPROM.put(address, users[i]);
-  }
-  EEPROM.commit();
-}
-
-/*
-* Replace all of the memory of the EEPROM by a zero, thereby reseting the memory
-*/
-void reset_memory() {
-  for (int i = 0 ; i < EEPROM.length() ; i++) {
-    EEPROM.write(i, 0);
-  }
-  EEPROM.commit();
-
-  initialize_user_array_from_eeprom();
-}
 
 /**
 * Compares the new hashed pin with the old hashed pin and updates the pin if they are different
