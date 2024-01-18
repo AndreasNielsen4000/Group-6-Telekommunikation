@@ -34,7 +34,7 @@
 #define NUM_USERS 5 // Number of users that can be saved in memory at the same time
 #define KEYCARD_LENGTH 11 // Length of the keycard UID in bytes
 #define MAX_MESSAGE_LENGTH 50 // Max length of the message from serial in bytes
-#define OPEN_DOOR_TIME 2000  // The time the door is open in milliseconds
+#define OPEN_DOOR_TIME 5000  // The time the door is open in milliseconds
 #define RFID_INTERVAL 5000  // Interval in milliseconds between RFID read
 #define WIFI_INTERVAL 1000  // Interval in milliseconds between WiFi read
 #define NEW_RFID_TIMEOUT 10000 // Time to read a new RFID before a timeout in milliseconds
@@ -43,8 +43,8 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance.
 Servo door_servo;
 
 // Wifi credentials
-const char *ssid = "";   /* Your SSID */
-const char *pass = "";   /* Your Password */
+const char *ssid = "Alexanders iPhone";   /* Your SSID */
+const char *pass = "tellmywifi";   /* Your Password */
 
 const char *apiUrl = "http://172.20.10.5:8080"; /* Your API URL. Example: "https://api.example.com" */
 
@@ -215,8 +215,11 @@ void loop() {
       unsigned long new_hashed_rfid = 0;
 
       do {
-        if (!mfrc522.PICC_IsNewCardPresent() && !mfrc522.PICC_ReadCardSerial()) {
+        if (!mfrc522.PICC_IsNewCardPresent()) {
           currentMillis = millis();
+          continue;
+        }
+        if (!mfrc522.PICC_ReadCardSerial()) {
           continue;
         }
         Serial.println("Has read data");
@@ -386,8 +389,6 @@ void loop() {
       no_access_tone();
     }
   }
-
-
 }
 
 /**
@@ -553,7 +554,7 @@ void open_door() {
 }
 
 void close_door() {
-  door_servo.write(90);
+  door_servo.write(100);
 }
 
 /**
