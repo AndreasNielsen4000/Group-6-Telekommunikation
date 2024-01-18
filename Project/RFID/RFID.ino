@@ -104,10 +104,10 @@ void setup() {
 }
 
 void loop() {
-  // The loop is split up into two parts, one for serial input and one for RFID input, serial input is based on the optionalCommand
+  // The loop is written in two parts, one for serial input and one for RFID input, serial input is based on the optionalCommand
 
   std::optional<CommandStruct> optionalCommand = processSerialCommunication();
-
+  //Serial input section
   // There is a command from serial to be executed
   if (optionalCommand.has_value()) {
     CommandStruct cmd = optionalCommand.value();
@@ -117,7 +117,7 @@ void loop() {
     case SerialCommand::LOGIN: {
       // Check if the password is correct
       // in either api or local if no internet
-      // save in EEPROM from API if it has changed?
+      // save in EEPROM from API if it has changed
       if (connected_to_wifi(0)) {
         Serial.println("Calling api to check data");
 
@@ -304,6 +304,7 @@ void loop() {
     }
   }
 
+  // RFID input section
     // Look for new cards
   if (!mfrc522.PICC_IsNewCardPresent()) {
     return;
