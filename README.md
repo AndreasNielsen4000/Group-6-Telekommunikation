@@ -1,5 +1,5 @@
 # Security Access system
-A door access security system for everyday use. The implemented log-on possibilities are RFID, Pin, and bluetooth from a mobile phone.
+A door access security system for everyday use. The implemented log-on possibilities are RFID, PIN, and bluetooth from a mobile phone.
 
 ## Responsibilities
 
