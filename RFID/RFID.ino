@@ -14,7 +14,7 @@
 #define buzzer D1
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance.
-Servo myservo;
+Servo door_servo;
 
 const char *ssid = "";   /* Your SSID */
 const char *pass = "";   /* Your Password */
@@ -26,7 +26,7 @@ unsigned long currentMillis;
 const long RFID_interval = 5000;  // Interval of RFID read
 const long WIFI_interval = 1000;  // Interval of WIFI read
 const int keycards = 5;
-const int keycard_length = 11;
+const int KEYCARD_LENGTH = 11;
 String UID[keycards];  // Create placeholders for the RFID tags
 
 void setup() {
@@ -44,13 +44,13 @@ void setup() {
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
-  EEPROM.begin(keycards * keycard_length);  // Initiate EEPROM memory size
+  EEPROM.begin(keycards * KEYCARD_LENGTH);  // Initiate EEPROM memory size
   SPI.begin();                              // Initiate  SPI bus
   mfrc522.PCD_Init();                       // Initiate MFRC522
   Serial.println("Approximate your card to the reader...");
   Serial.println();
 
-  myservo.attach(2, 500, 2400);  // Attaches the servo on pin D4 to the servo object
+  door_servo.attach(2, 500, 2400);  // Attaches the servo on pin D4 to the servo object
   pinMode(buzzer, OUTPUT);
 
   //UID[0] = "           ";
@@ -69,7 +69,7 @@ void setup() {
     Serial.println(UID[i]);
   }
 
-  //put_memory("17 48 43 4A");
+  //write_user_array_to_eeprom("17 48 43 4A");
 }
 
 void loop() {
@@ -163,8 +163,8 @@ String read_RFID() {
 
 String read_memory(int x) {
   String memory = "";
-  for (int i = 0; i < keycard_length; i++) {
-    memory = String(memory + char(EEPROM.read(i + keycard_length * x)));
+  for (int i = 0; i < KEYCARD_LENGTH; i++) {
+    memory = String(memory + char(EEPROM.read(i + KEYCARD_LENGTH * x)));
   }
   return memory;
 }
@@ -172,12 +172,12 @@ String read_memory(int x) {
 void manual_put_memory(String memory, int x) {
   for (int i = 0; i < memory.length(); ++i) {
     Serial.print(memory[i]);
-    EEPROM.write(i + keycard_length * x, memory[i]);
+    EEPROM.write(i + KEYCARD_LENGTH * x, memory[i]);
   }
   EEPROM.commit();
 }
 
-void put_memory(String memory) {
+void write_user_array_to_eeprom(String memory) {
   // Checks if the new UID to be saved is allready saved
   for (int i = 0; i < keycards; i++) {
     if (read_memory(i) == memory) {
@@ -200,7 +200,7 @@ void remove_memory(String memory) {
   for (int i = 0; i < keycards; i++) {
     if (read_memory(i) == memory) {
       for (int x = 0; x < memory.length(); ++x) {
-        EEPROM.write(x + i * keycard_length, 32);
+        EEPROM.write(x + i * KEYCARD_LENGTH, 32);
       }
       EEPROM.commit();
     }
@@ -209,8 +209,8 @@ void remove_memory(String memory) {
 
 void reset_memory() {
   for (int i = 0; i < keycards; i++) {
-    for (int x = 0; x < keycard_length; ++x) {
-      EEPROM.write(x + i * keycard_length, 32);
+    for (int x = 0; x < KEYCARD_LENGTH; ++x) {
+      EEPROM.write(x + i * KEYCARD_LENGTH, 32);
     }
   }
   EEPROM.commit();
@@ -244,9 +244,9 @@ void no_access_tone() {
 }
 
 void open_door() {
-  myservo.write(0);
+  door_servo.write(0);
 }
 
 void close_door() {
-  myservo.write(90);
+  door_servo.write(90);
 }

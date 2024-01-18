@@ -45,7 +45,7 @@ std::unique_ptr<DynamicJsonDocument> ApiCaller::GET(String endpoint, String valu
 
     String payload = https.getString();
     // TODO: figure out how big DynamicJsonDocument should be
-    std::unique_ptr<DynamicJsonDocument> doc = std::make_unique<DynamicJsonDocument>(payload.length() * 2);
+    std::unique_ptr<DynamicJsonDocument> doc = std::make_unique<DynamicJsonDocument>(payload.length() * 4);
 
     // cleanup the https connection
     https.end();

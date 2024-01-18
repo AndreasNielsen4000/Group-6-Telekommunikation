@@ -1,3 +1,11 @@
+/* 
+ * This file contains the implementation of the ApiCaller class.
+ * The ApiCaller class is used to make calls to an API.
+ * It is used to contact the server.
+ * Main Responsible:
+ * Mads/Maria?
+*/
+
 #include "api_caller.h"
 #include <iostream>
 #include <string>

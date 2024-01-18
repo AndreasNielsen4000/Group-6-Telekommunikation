@@ -1,3 +1,8 @@
+/* Server for door access control system
+ * Main responsible:
+ - Mads/Maria
+*/
+
 const express = require("express");
 const app = express();
 const port = 8080;
@@ -5,22 +10,43 @@ const port = 8080;
 // mock database
 let usersDatabase = [{
         id: 0,
-        pin: 1234,
-        rfid: ["1234567890"]
+        pin: 2088290703, // 1234
+        rfid: 3744025910 // card
     },
+    //{
+    //    id: 1,
+    //    pin: 2088290703, // 1234
+    //    rfid: 4239274179 // Blue chip
+    //}
     {
         id: 1,
-        pin: 4321,
-        rfid: ["0987654321"]
-    }
+        pin: 0,
+        rfid: 0
+    },
+    {
+        id: 2,
+        pin: 0,
+        rfid: 0
+    },
+    {
+        id: 3,
+        pin: 0,
+        rfid: 0
+    },
+    {
+        id: 4,
+        pin: 0,
+        rfid: 0
+    },
+
 ];
 
 // middleware
 
 // check if pin exists in the database and returns `authenticated: false` if not
 const checkPin = (req, res, next) => {
-    const pin = req.params.pin;
-    const user = usersDatabase.find(user => user.pin === parseInt(pin));
+    const pin = parseInt(req.params.pin);
+    const user = usersDatabase.find(user => user.pin == pin);
     if (user) {
         req.user = user;
         next();
@@ -34,9 +60,13 @@ const checkPin = (req, res, next) => {
 
 // check if rfid exists in the database and returns `authenticated: false` if not
 const checkRfid = (req, res, next) => {
-    const rfid = req.params.rfid;
-    const user = usersDatabase.find(user => user.rfid.includes(rfid));
+    const rfid = parseInt(req.params.rfid);
+    const user = usersDatabase.find(user => user.rfid == rfid);
+
+    console.log(`rfid: ${rfid}, user: ${user}`)
+
     if (user) {
+        console.log("success rfid found in database");
         req.user = user;
         next();
     } else {
@@ -53,7 +83,7 @@ app.get("/pin/:pin", checkPin, (req, res) => {
 
     res.json({
         authenticated: true,
-        message: "Welcome user " + user.id,
+        id: user.id,
     });
 
 });
@@ -63,7 +93,7 @@ app.get("/rfid/:rfid", checkRfid, (req, res) => {
 
     res.json({
         authenticated: true,
-        message: "Welcome user " + user.id,
+        id: user.id,
     });
 });
 
@@ -74,11 +104,11 @@ app.get("/database", (req, res) => {
 
 // Update pin for user
 app.put("/pin/:id/:pin", (req, res) => {
-    const id = req.params.id;
-    const pin = req.params.pin;
+    const id = parseInt(req.params.id);
+    const pin = parseInt(req.params.pin);
 
     // TODO: check if database goes to 5
-    if(id <= 0 || id > 5) {
+    if(id < 5 && id >= 0 ) {
         usersDatabase[id].pin = pin;
         res.json({
             success: true,
@@ -93,10 +123,12 @@ app.put("/pin/:id/:pin", (req, res) => {
 
 // Update rfid for user
 app.put("/rfid/:id/:rfid", (req, res) => {
-    const id = req.params.id;
-    const rfid = req.params.rfid;
+    const id = parseInt(req.params.id);
+    const rfid = parseInt(req.params.rfid);
 
-    if(id <= 0 || id > 5) {
+    console.log(`id: ${id}, rfid: ${rfid}`);
+
+    if(id < 5 && id >= 0 ) {
         usersDatabase[id].rfid = rfid;
         res.json({
             success: true,
@@ -113,4 +145,3 @@ app.put("/rfid/:id/:rfid", (req, res) => {
 app.listen(port, () => {
     console.log(`Example app listening on port ${port}`)
 })
-

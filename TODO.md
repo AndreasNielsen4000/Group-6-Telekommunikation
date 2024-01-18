@@ -9,4 +9,6 @@
 ---
 
 Api todo
+- [ ] The `users` array should just be stored in the EEPROM
+- [ ] clean up repo
 - [ ] Check if api pin or rfid is diffrenet that stored on bord and overwrite if it is

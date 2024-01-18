@@ -14,13 +14,12 @@ private:
 public:
     lcd_display();
     void init();
-    // maybe change user to adminAccess boolean
     void enterPasswordLCD(char user[]);
     void updatePasswordLCD();
     void wrongPasswordLCD();
     void accessGrantedLCD(int userIndex);
-    void passTooLongLCD();
-    void printUserNameLCD(int userIndex);
+    void adminMenuLCD(int userIndex);
+    void presentRFIDLCD();
 };
 
 

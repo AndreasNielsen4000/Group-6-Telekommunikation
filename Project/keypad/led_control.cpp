@@ -1,11 +1,17 @@
+/*
+* led_control.cpp
+* Class and methods for controlling the LED and light sensor for the keypad
+* Written by Alexander Nordentoft (s176361) and Andreas Nielsen (s203833) - January 2024
+* Estimated workshare: Alexander Nordentoft (s176361) 60% - Andreas Nielsen (s203833) 40%
+*/
+
 #include "led_control.h"
-
-
 
 led_control::led_control(int redPin, int greenPin, int bluePin, int lightPin, int ldrPin, int buzzerPin) : 
               PIN_RED(redPin), PIN_GREEN(greenPin), PIN_BLUE(bluePin), PIN_LIGHT(lightPin), LDRPin(ldrPin), buzzerPin(buzzerPin) {
 }
 
+//Initializes the LED and light sensor pins
 void led_control::init() {
   pinMode(PIN_RED,   OUTPUT);
   pinMode(PIN_GREEN, OUTPUT);
@@ -14,11 +20,9 @@ void led_control::init() {
   pinMode(PIN_LIGHT, OUTPUT);
   pinMode(LDRPin, INPUT);
   pinMode(buzzerPin, OUTPUT);
-  //tone(buzzerPin, 698, 200);
-  //delay(100);
-  //tone(buzzerPin, 698, 200);
 }
 
+//Controls the LED based on the status
 void led_control::controlLED(int status) {
   switch(status){
     case 0: //Idle LED status
@@ -30,20 +34,16 @@ void led_control::controlLED(int status) {
       analogWrite(PIN_RED,   0);
       analogWrite(PIN_GREEN, 255);
       analogWrite(PIN_BLUE,  0);
-      //tone(buzzerPin, 523, 500);
-      //tone(buzzerPin, 523, 500);
       break;
     case 2: //Wrong Password LED status
       for (int i = 0; i < 5; i++){
         analogWrite(PIN_RED,   255);
         analogWrite(PIN_GREEN, 0);
         analogWrite(PIN_BLUE,  0);
-        //tone(buzzerPin, 262, 300);
         delay(300);
         analogWrite(PIN_RED,   0);
         analogWrite(PIN_GREEN, 0);
         analogWrite(PIN_BLUE,  0);
-        //tone(buzzerPin, 262, 300);
         delay(300);
       }
       break;
@@ -62,6 +62,7 @@ void led_control::controlLED(int status) {
 }
 
 
+//Reads the light sensor and turns on the light if it is dark, and turns it off if it is light.
 void led_control::readLightSensor() {
   int lightValue = analogRead(LDRPin);
   if (lightValue < 2500){
@@ -71,7 +72,7 @@ void led_control::readLightSensor() {
   }
 }
 
-
+//Blinks the LED and plays a tone when a key is pressed
 void led_control::keyPressLED() {
     tone(buzzerPin, 698, 20);
     controlLED(9);
