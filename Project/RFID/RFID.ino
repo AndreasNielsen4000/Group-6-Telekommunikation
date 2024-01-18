@@ -32,8 +32,8 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance.
 Servo door_servo;
 
 // Wifi credentials
-const char *ssid = "Alexanders iPhone";   /* Your SSID */
-const char *pass = "tellmywifi";   /* Your Password */
+const char *ssid = "";   /* Your SSID */
+const char *pass = "";   /* Your Password */
 
 const char *apiUrl = "http://172.20.10.5:8080"; /* Your API URL. Example: "https://api.example.com" */
 
