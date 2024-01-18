@@ -15,7 +15,6 @@
   - Andreas Nielsen (s203833)
 */
 
-
 #include <ArduinoJson.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
@@ -279,7 +278,6 @@ void loop() {
         break;
       }
 
-
       std::unique_ptr<DynamicJsonDocument> doc = apiCaller.PUT("/pin", String(cmd.userIndex.value()), String(cmd.password.value()));
       if (doc == nullptr) {
         sendSerialResponse(SerialSend::ACCESS_DENIED);
@@ -306,7 +304,6 @@ void loop() {
         sendSerialResponse(SerialSend::ACCESS_DENIED);
         no_access_tone();
       }
-
 
     }
     default:
@@ -552,7 +549,7 @@ void no_access_tone() {
 
 
 void open_door() {
-  door_servo.write(0);
+  door_servo.write(180);
 }
 
 void close_door() {
