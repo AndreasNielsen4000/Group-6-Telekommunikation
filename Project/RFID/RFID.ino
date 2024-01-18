@@ -134,7 +134,7 @@ void loop() {
             sendSerialResponse(SerialSend::ACCESS_GRANTED, id);
             if (users[id].pin != cmd.password.value()) {
               Serial.println("Found password in server but not in EEPROM, adding password to EEPROM");
-              compare_and_update_rfid(id, cmd.password.value());
+              compare_and_update_pin(id, cmd.password.value());
             }
             
             access_tone();
