@@ -35,7 +35,7 @@ On any access granted or access denied response from the server, the ESP8266 che
 |---|---|---|
 | API | Mads | Maria |
 | Server | Maria | Mads |
-| LCD | Andreas | Maria |
+| LCD | Andreas | Alexander, Maria |
 | LEDs | Mads | Maria |
 | Buzzer | Christian | Lukas |
 | Serial communication | Alexander | Lukas, Mads, Andreas |
