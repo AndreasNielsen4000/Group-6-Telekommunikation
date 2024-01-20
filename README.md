@@ -51,3 +51,8 @@ On any access granted or access denied response from the server, the ESP8266 che
 
 ## Circuit diagram
 ![Complete setup](Complete_circuit_bb.png)
+
+## Video Preview of Functionality
+
+https://github.com/AndreasNielsen4000/Group-6-Telekommunikation/assets/8758884/5dff1484-a8b8-44ab-9b94-1a6748f98a57
+
