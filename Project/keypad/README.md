@@ -89,3 +89,6 @@ After a new RFID has been read, the RFID ESP sends the following command to veri
 If instead an RFID chip was not read or an error occured the RFID ESP will send:
 
 `ACCESS_DENIED,`
+
+## Circuit diagram
+![ESP32 Keypad setup](Fritzing_keypad.png)
